@@ -1,0 +1,722 @@
+.counter {
+  font-size: 16px;
+  padding: 5px 10px;
+  border-radius: 5px;
+  color: var(--accent);
+  background: var(--accent-bg);
+  border: 2px solid transparent;
+  transition: border-color 0.3s;
+  margin-bottom: 24px;
+
+  &:hover {
+    border-color: var(--accent-border);
+  }
+  &:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+}
+
+.hero {
+  position: relative;
+
+  .base,
+  .framework,
+  .vite {
+    inset-inline: 0;
+    margin: 0 auto;
+  }
+
+  .base {
+    width: 170px;
+    position: relative;
+    z-index: 0;
+  }
+
+  .framework,
+  .vite {
+    position: absolute;
+  }
+
+  .framework {
+    z-index: 1;
+    top: 34px;
+    height: 28px;
+    transform: perspective(2000px) rotateZ(300deg) rotateX(44deg) rotateY(39deg)
+      scale(1.4);
+  }
+
+  .vite {
+    z-index: 0;
+    top: 107px;
+    height: 26px;
+    width: auto;
+    transform: perspective(2000px) rotateZ(300deg) rotateX(40deg) rotateY(39deg)
+      scale(0.8);
+  }
+}
+
+#center {
+  display: flex;
+  flex-direction: column;
+  gap: 25px;
+  place-content: center;
+  place-items: center;
+  flex-grow: 1;
+
+  @media (max-width: 1024px) {
+    padding: 32px 20px 24px;
+    gap: 18px;
+  }
+}
+
+#next-steps {
+  display: flex;
+  border-top: 1px solid var(--border);
+  text-align: left;
+
+  & > div {
+    flex: 1 1 0;
+    padding: 32px;
+    @media (max-width: 1024px) {
+      padding: 24px 20px;
+    }
+  }
+
+  .icon {
+    margin-bottom: 16px;
+    width: 22px;
+    height: 22px;
+  }
+
+  @media (max-width: 1024px) {
+    flex-direction: column;
+    text-align: center;
+  }
+}
+
+#docs {
+  border-right: 1px solid var(--border);
+
+  @media (max-width: 1024px) {
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+}
+
+#next-steps ul {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  gap: 8px;
+  margin: 32px 0 0;
+
+  .logo {
+    height: 18px;
+  }
+
+  a {
+    color: var(--text-h);
+    font-size: 16px;
+    border-radius: 6px;
+    background: var(--social-bg);
+    display: flex;
+    padding: 6px 12px;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+    transition: box-shadow 0.3s;
+
+    &:hover {
+      box-shadow: var(--shadow);
+    }
+    .button-icon {
+      height: 18px;
+      width: 18px;
+    }
+  }
+
+  @media (max-width: 1024px) {
+    margin-top: 20px;
+    flex-wrap: wrap;
+    justify-content: center;
+
+    li {
+      flex: 1 1 calc(50% - 8px);
+    }
+
+    a {
+      width: 100%;
+      justify-content: center;
+      box-sizing: border-box;
+    }
+  }
+}
+
+#spacer {
+  height: 88px;
+  border-top: 1px solid var(--border);
+  @media (max-width: 1024px) {
+    height: 48px;
+  }
+}
+
+.ticks {
+  position: relative;
+  width: 100%;
+
+  &::before,
+  &::after {
+    content: '';
+    position: absolute;
+    top: -4.5px;
+    border: 5px solid transparent;
+  }
+
+  &::before {
+    left: 0;
+    border-left-color: var(--border);
+  }
+  &::after {
+    right: 0;
+    border-right-color: var(--border);
+  }
+}
+/* ============================================================
+   APP.CSS — Layout + Footer Styles
+   ============================================================ */
+
+/* ===== Layout ===== */
+.app-layout {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.app-main {
+  flex: 1;
+}
+
+/* ===== Footer Base ===== */
+.ft {
+  margin-top: 0;
+}
+
+/* ===== Newsletter Bar ===== */
+.ft__newsletter {
+  background: linear-gradient(135deg, #f68b1e 0%, #e06800 100%);
+  padding: 0;
+}
+
+.ft__newsletter-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 36px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 32px;
+}
+
+.ft__newsletter-text {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  color: white;
+  flex-shrink: 0;
+}
+
+.ft__newsletter-icon {
+  margin-top: 2px;
+  opacity: 0.9;
+}
+
+.ft__newsletter-title {
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.2;
+  color: white;
+}
+
+.ft__newsletter-sub {
+  font-size: 13px;
+  opacity: 0.85;
+  margin-top: 3px;
+  line-height: 1.4;
+}
+
+.ft__newsletter-form {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+  max-width: 420px;
+  width: 100%;
+}
+
+.ft__newsletter-input-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  padding: 0 12px;
+  height: 44px;
+  backdrop-filter: blur(4px);
+}
+
+.ft__newsletter-input-icon {
+  color: rgba(255, 255, 255, 0.6);
+  flex-shrink: 0;
+}
+
+.ft__newsletter-input {
+  flex: 1;
+  height: 100%;
+  border: none;
+  background: transparent;
+  color: white;
+  font-size: 13px;
+  padding: 0 8px;
+  outline: none;
+  font-family: inherit;
+  min-width: 0;
+}
+
+.ft__newsletter-input::placeholder {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.ft__newsletter-btn {
+  height: 44px;
+  padding: 0 24px;
+  background: white;
+  color: #f68b1e;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+  font-family: inherit;
+  flex-shrink: 0;
+}
+
+.ft__newsletter-btn:hover {
+  background: #fff5eb;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* ===== Main Footer Content ===== */
+.ft__main {
+  background: #1a1a2e;
+  padding: 48px 0 40px;
+}
+
+.ft__container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.ft__main .ft__container {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 1fr 1.2fr;
+  gap: 40px;
+}
+
+/* ===== Brand Column ===== */
+.ft__logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  margin-bottom: 14px;
+}
+
+.ft__logo-icon {
+  width: 36px;
+  height: 36px;
+  background: #f68b1e;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+}
+
+.ft__logo-name {
+  font-size: 20px;
+  font-weight: 800;
+  color: white;
+  letter-spacing: -0.3px;
+}
+
+.ft__brand-desc {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.5);
+  line-height: 1.65;
+  margin-bottom: 18px;
+}
+
+/* Social Icons */
+.ft__socials {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.ft__social {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.6);
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.ft__social:hover {
+  background: #f68b1e;
+  color: white;
+  transform: translateY(-2px);
+}
+
+/* App Badges */
+.ft__app-badges {
+  display: flex;
+  gap: 8px;
+}
+
+.ft__app-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.ft__app-badge:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.ft__app-badge-sm {
+  display: block;
+  font-size: 8px;
+  color: rgba(255, 255, 255, 0.6);
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.ft__app-badge-lg {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+/* ===== Footer Columns ===== */
+.ft__col-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: white;
+  margin-bottom: 18px;
+  position: relative;
+  padding-bottom: 10px;
+}
+
+.ft__col-title::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 24px;
+  height: 2px;
+  background: #f68b1e;
+  border-radius: 1px;
+}
+
+.ft__col-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ft__col-list li a {
+  color: rgba(255, 255, 255, 0.5);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ft__col-list li a::before {
+  content: "";
+  width: 0;
+  height: 1px;
+  background: #f68b1e;
+  transition: width 0.2s ease;
+}
+
+.ft__col-list li a:hover {
+  color: #f68b1e;
+  padding-left: 4px;
+}
+
+.ft__col-list li a:hover::before {
+  width: 8px;
+}
+
+/* ===== Contact List ===== */
+.ft__contact-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ft__contact-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.ft__contact-item Icon {
+  color: #f68b1e;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+/* Trust Badges */
+.ft__trust {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.ft__trust-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 500;
+}
+
+.ft__trust-item Icon {
+  color: #27ae60;
+}
+
+/* ===== Payment Methods Strip ===== */
+.ft__payments {
+  background: #151528;
+  padding: 18px 0;
+}
+
+.ft__payments-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.ft__payments-label {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.4);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.ft__payments-icons {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.ft__pay-icon {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.ft__pay-icon Icon {
+  opacity: 0.7;
+}
+
+/* ===== Bottom Bar ===== */
+.ft__bottom {
+  background: #10101e;
+  padding: 16px 0;
+}
+
+.ft__bottom-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.ft__copy {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.3);
+  margin: 0;
+}
+
+.ft__bottom-links {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.ft__bottom-links a {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.35);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.ft__bottom-links a:hover {
+  color: #f68b1e;
+}
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+
+@media (max-width: 1024px) {
+  .ft__main .ft__container {
+    grid-template-columns: 1fr 1fr;
+    gap: 32px;
+  }
+
+  .ft__brand {
+    grid-column: 1 / -1;
+  }
+
+  .ft__newsletter-inner {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .ft__newsletter-text {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .ft__newsletter-form {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .ft__main .ft__container {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+
+  .ft__main {
+    padding: 32px 0 28px;
+  }
+
+  .ft__newsletter-inner {
+    padding: 24px 16px;
+  }
+
+  .ft__newsletter-title {
+    font-size: 17px;
+  }
+
+  .ft__newsletter-form {
+    flex-direction: column;
+  }
+
+  .ft__newsletter-btn {
+    width: 100%;
+  }
+
+  .ft__app-badges {
+    flex-direction: column;
+  }
+
+  .ft__app-badge {
+    justify-content: center;
+  }
+
+  .ft__payments-inner {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .ft__payments-icons {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .ft__bottom-inner {
+    flex-direction: column;
+    text-align: center;
+    gap: 10px;
+  }
+
+  .ft__bottom-links {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 12px;
+  }
+
+  .ft__container {
+    padding: 0 16px;
+  }
+}
+
+/* Safe area for bottom nav */
+@media (max-width: 768px) {
+  .ft {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}
+
+/* ===== Print ===== */
+@media print {
+  .ft {
+    display: none !important;
+  }
+}
+/* Add this to App.css */
+.ft__logo-custom-img {
+  height: 40px;
+  width: auto;
+  object-fit: contain;
+}
