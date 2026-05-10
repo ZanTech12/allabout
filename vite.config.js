@@ -7,7 +7,7 @@ export default defineConfig({
     port: 3000,
     proxy: {
       '/api': {
-        target: 'http://172.29.136.57:5000',
+        target: 'https://ecommerce-25vb.onrender.com',
         changeOrigin: true,
       }
     }
