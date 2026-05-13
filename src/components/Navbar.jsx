@@ -1313,14 +1313,23 @@ export default function Navbar() {
               <Link to="/register" onClick={closeMobile} className="nb__drawer-auth-btn nb__drawer-auth-btn--register">Sign Up</Link>
             </div>
           )}
-          <nav className="nb__drawer-nav">
-            <Link to="/" onClick={closeMobile} className="nb__drawer-link"><Icon icon="lucide:home" width={19} /><span>Home</span><Icon icon="lucide:chevron-right" width={16} className="nb__drawer-link-arrow" /></Link>
-            <Link to="/products" onClick={closeMobile} className="nb__drawer-link"><Icon icon="lucide:grid-3x3" width={19} /><span>All Products</span><Icon icon="lucide:chevron-right" width={16} className="nb__drawer-link-arrow" /></Link>
-            <Link to="/track-order" onClick={closeMobile} className="nb__drawer-link"><Icon icon="lucide:map-pin" width={19} /><span>Track Order</span><Icon icon="lucide:chevron-right" width={16} className="nb__drawer-link-arrow" /></Link>
-            <Link to="/my-orders" onClick={closeMobile} className="nb__drawer-link"><Icon icon="lucide:package" width={19} /><span>My Orders</span><Icon icon="lucide:chevron-right" width={16} className="nb__drawer-link-arrow" /></Link>
-            <Link to="/cart" onClick={closeMobile} className="nb__drawer-link"><Icon icon="lucide:shopping-cart" width={19} /><span>My Cart ({totalQty})</span><Icon icon="lucide:chevron-right" width={16} className="nb__drawer-link-arrow" /></Link>
-            <Link to="/help" onClick={closeMobile} className="nb__drawer-link"><Icon icon="lucide:help-circle" width={19} /><span>Help Center</span><Icon icon="lucide:chevron-right" width={16} className="nb__drawer-link-arrow" /></Link>
-          </nav>
+         <nav className="nb__drawer-nav">
+  <Link to="/" onClick={closeMobile} className="nb__drawer-link"><Icon icon="lucide:home" width={19} /><span>Home</span><Icon icon="lucide:chevron-right" width={16} className="nb__drawer-link-arrow" /></Link>
+  <Link to="/products" onClick={closeMobile} className="nb__drawer-link"><Icon icon="lucide:grid-3x3" width={19} /><span>All Products</span><Icon icon="lucide:chevron-right" width={16} className="nb__drawer-link-arrow" /></Link>
+  <Link to="/track-order" onClick={closeMobile} className="nb__drawer-link"><Icon icon="lucide:map-pin" width={19} /><span>Track Order</span><Icon icon="lucide:chevron-right" width={16} className="nb__drawer-link-arrow" /></Link>
+  <Link to="/my-orders" onClick={closeMobile} className="nb__drawer-link"><Icon icon="lucide:package" width={19} /><span>My Orders</span><Icon icon="lucide:chevron-right" width={16} className="nb__drawer-link-arrow" /></Link>
+  <Link to="/cart" onClick={closeMobile} className="nb__drawer-link"><Icon icon="lucide:shopping-cart" width={19} /><span>My Cart ({totalQty})</span><Icon icon="lucide:chevron-right" width={16} className="nb__drawer-link-arrow" /></Link>
+  <Link to="/help" onClick={closeMobile} className="nb__drawer-link"><Icon icon="lucide:help-circle" width={19} /><span>Help Center</span><Icon icon="lucide:chevron-right" width={16} className="nb__drawer-link-arrow" /></Link>
+  
+  {/* ✅ ADMIN ONLY LINK FOR MOBILE DRAWER */}
+  {user?.role === "admin" && (
+    <Link to="/admin/dashboard" onClick={closeMobile} className="nb__drawer-link">
+      <Icon icon="lucide:layout-dashboard" width={19} />
+      <span>Admin Panel</span>
+      <Icon icon="lucide:chevron-right" width={16} className="nb__drawer-link-arrow" />
+    </Link>
+  )}
+</nav>
           {user && (
             <div className="nb__drawer-footer">
               <button onClick={() => { handleLogout(); closeMobile(); }} className="nb__drawer-logout"><Icon icon="lucide:log-out" width={18} /><span>Sign Out</span></button>
