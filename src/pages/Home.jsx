@@ -132,7 +132,7 @@ const DropdownProductPreview = ({ p, currency, onClose }) => {
 };
 
 // ═══════ MOVED OUTSIDE: ProductCard ═══════
-const ProductCard = ({ p, prefix = "", showProgress = false, showNew = false, compact = false, currency, cartQty, isSyncing, onAddToCart }) => {
+const ProductCard = ({ p, prefix = "", showProgress = false, showNew = false, compact = false, flash = false, currency, cartQty, isSyncing, onAddToCart }) => {
   const pct = discountPct(p);
   const itemsLeft = p.countInStock ?? 0;
   const totalStock = p.totalStock ?? p.initialStock ?? null;
@@ -148,7 +148,7 @@ const ProductCard = ({ p, prefix = "", showProgress = false, showNew = false, co
   return (
     <Link
       to={`/product/${p._id}`}
-      className={`jm-product-card ${compact ? "jm-product-card--compact" : ""}`}
+      className={`jm-product-card ${compact ? "jm-product-card--compact" : ""} ${flash ? "jm-product-card--flash" : ""}`}
       onClick={(e) => {
         if (e.target.closest('.jm-product-card__cart-action')) {
           e.preventDefault();
@@ -156,27 +156,27 @@ const ProductCard = ({ p, prefix = "", showProgress = false, showNew = false, co
       }}
     >
       <div className="jm-product-card__img-wrap">
-        {pct && <span className="jm-discount-badge">-{pct}%</span>}
+        {pct && <span className="jm-discount-badge" style={flash ? { color: "#fff", background: "rgba(255,255,255,0.2)", border: "1px solid rgba(255,255,255,0.4)" } : undefined}>-{pct}%</span>}
         {showNew && <span className="jm-new-badge">NEW</span>}
         {isOutOfStock && <span className="jm-oos-badge">OUT OF STOCK</span>}
         <img src={p.image || `https://picsum.photos/seed/${prefix}${p._id}/300/300`} alt={p.name} className="jm-product-card__img" loading="lazy" />
         <div className="jm-product-card__img-overlay" />
       </div>
       <div className="jm-product-card__info">
-        <h3 className="jm-product-card__name">{p.name}</h3>
+        <h3 className="jm-product-card__name" style={flash ? { color: "#fff" } : undefined}>{p.name}</h3>
         <div className="jm-product-card__prices">
-          <span className="jm-product-card__price">{currency}{(p.discountPrice || p.price)?.toLocaleString()}</span>
-          {p.discountPrice && p.price && <span className="jm-product-card__old-price">{currency}{p.price.toLocaleString()}</span>}
+          <span className="jm-product-card__price" style={flash ? { color: "#fff" } : undefined}>{currency}{(p.discountPrice || p.price)?.toLocaleString()}</span>
+          {p.discountPrice && p.price && <span className="jm-product-card__old-price" style={flash ? { color: "rgba(255,255,255,0.55)" } : undefined}>{currency}{p.price.toLocaleString()}</span>}
         </div>
         {p.discountPrice && p.price && (
-          <span className="jm-product-card__save">You save {currency}{(p.price - p.discountPrice).toLocaleString()}</span>
+          <span className="jm-product-card__save" style={flash ? { color: "rgba(255,255,255,0.7)" } : undefined}>You save {currency}{(p.price - p.discountPrice).toLocaleString()}</span>
         )}
         {showProgress && (
           <div className="jm-flash-progress">
             <div className="jm-flash-progress__bar">
               <div className="jm-flash-progress__fill" style={{ width: `${soldPct}%` }} />
             </div>
-            <span className="jm-flash-progress__text">{itemsLeft} items left</span>
+            <span className="jm-flash-progress__text" style={flash ? { color: "rgba(255,255,255,0.7)" } : undefined}>{itemsLeft} items left</span>
           </div>
         )}
         <div className="jm-product-card__cart-action">
@@ -185,6 +185,7 @@ const ProductCard = ({ p, prefix = "", showProgress = false, showNew = false, co
           ) : (
             <button
               className={`jm-add-to-cart-btn ${cartQty > 0 ? "jm-add-to-cart-btn--in-cart" : ""}`}
+              style={flash ? { background: "rgba(255,255,255,0.15)", color: "#fff", border: "1px solid rgba(255,255,255,0.3)" } : undefined}
               onClick={(e) => onAddToCart(e, p)}
               disabled={isSyncing}
             >
@@ -756,7 +757,7 @@ export default function Home() {
           </div>
           <div className="jm-product-grid jm-product-grid--5">
             {flashSaleProducts.slice(0, 10).map((p) => (
-              <ProductCard key={p._id} p={p} prefix="flash-" showProgress currency={currency} cartQty={getCartQty(p._id)} isSyncing={isSyncing} onAddToCart={handleAddToCart} />
+              <ProductCard key={p._id} p={p} prefix="flash-" showProgress flash currency={currency} cartQty={getCartQty(p._id)} isSyncing={isSyncing} onAddToCart={handleAddToCart} />
             ))}
           </div>
         </section>

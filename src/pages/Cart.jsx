@@ -23,7 +23,7 @@ export default function Cart() {
   const customerEmail = user?.email || "";
   
   const PAYSTACK_PUBLIC_KEY = "pk_live_73d373180bd0c70bd6baf9bf603136691f7b1867";
-  const ADMIN_WHATSAPP_NUMBER = "2348000000000";
+  const ADMIN_WHATSAPP_NUMBER = "2347069383526";
 
   const deliveryFee = totalPrice > 15000 ? 0 : 2500;
   const grandTotal = totalPrice + deliveryFee;
