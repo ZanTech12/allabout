@@ -244,6 +244,7 @@ export default function Home() {
   const [mobileCatDrawer, setMobileCatDrawer] = useState(false);
   const [hoveredSidebarCat, setHoveredSidebarCat] = useState(null);
   const [mobileExpandedCat, setMobileExpandedCat] = useState(null);
+  const [productCategories, setProductCategories] = useState({}); // Updated to state
   const catScrollRef = useRef(null);
   const dropdownRef = useRef(null);
   const mobileDrawerRef = useRef(null);
@@ -316,16 +317,30 @@ export default function Home() {
   useEffect(() => {
     const fetchAll = async () => {
       try {
-        const [prodRes, catRes, setRes] = await Promise.all([
-          api.get("/products"),
+        const [catRes, setRes, groupedRes] = await Promise.all([
           api.get("/categories"),
           api.get("/site-settings"),
+          api.get("/products/grouped"), // Using the new grouped endpoint
         ]);
-        setProducts(prodRes.data);
+        
+        const groupedData = groupedRes.data;
+        const mappedCategories = {};
+        const allProducts = [];
+        
+        if (Array.isArray(groupedData)) {
+          groupedData.forEach(group => {
+            const catName = group._id || "Uncategorized";
+            mappedCategories[catName] = group.products;
+            allProducts.push(...group.products);
+          });
+        }
+        
+        setProducts(allProducts);
         setCategories(catRes.data.categories || catRes.data);
         setSiteSettings(setRes.data);
-        const cats = groupByCategory(prodRes.data);
-        const keys = Object.keys(cats);
+        setProductCategories(mappedCategories);
+        
+        const keys = Object.keys(mappedCategories);
         if (keys.length) setActiveCat(keys[0]);
       } catch (error) {
         console.error("Could not fetch data", error);
@@ -354,8 +369,6 @@ export default function Home() {
     }, 1000);
     return () => clearInterval(timer);
   }, []);
-
-  const productCategories = groupByCategory(products);
 
   const getCartQty = (productId) => {
     const item = cart.find((c) => c.product === productId || c.product?._id === productId);
@@ -888,7 +901,7 @@ export default function Home() {
                 <Link to={`/products?category=${activeCat}`} className="jm-section__see-all">VIEW ALL <Icon icon="lucide:chevron-right" width={14} /></Link>
               </div>
               <div className="jm-product-grid jm-product-grid--4">
-                {productCategories[activeCat].slice(0, 8).map((p) => (
+                {productCategories[activeCat].map((p) => (
                   <ProductCard key={`cat-${p._id}`} p={p} prefix={`cat-${activeCat}-`} currency={currency} cartQty={getCartQty(p._id)} isSyncing={isSyncing} onAddToCart={handleAddToCart} />
                 ))}
               </div>
@@ -970,7 +983,7 @@ export default function Home() {
             <Link to={`/products?category=${catName}`} className="jm-section__see-all">VIEW ALL <Icon icon="lucide:chevron-right" width={14} /></Link>
           </div>
           <div className="jm-product-grid jm-product-grid--4">
-            {items.slice(0, 4).map((p) => (
+            {items.map((p) => (
               <ProductCard key={`list-${catName}-${p._id}`} p={p} prefix={`list-${catName}-`} currency={currency} cartQty={getCartQty(p._id)} isSyncing={isSyncing} onAddToCart={handleAddToCart} />
             ))}
           </div>
