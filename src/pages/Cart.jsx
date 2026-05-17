@@ -1,65 +1,158 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Icon } from '@iconify/react';
 import { usePaystackPayment } from 'react-paystack';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axios';
+import Point from './Point';
 import './Cart.css';
 
+const getEffectivePrice = (item, isEngineer = false) => {
+  const price = Number(item.price) || 0;
+  const discountPrice = Number(item.discountPrice) || 0;
+  const engineeringPrice = Number(item.engineeringPrice) || 0;
+
+  if (isEngineer && engineeringPrice > 0) {
+    return engineeringPrice;
+  }
+  return discountPrice > 0 && discountPrice < price ? discountPrice : price;
+};
+
 export default function Cart() {
-  const { 
-    cart = [], 
-    totalPrice = 0, 
-    totalQty = 0, 
-    updateCartQty = () => {}, 
-    removeFromCart = () => {}, 
-    clearCart = async () => {}, 
-    isLoading = false, 
-    isSyncing = false 
+  const {
+    cart = [],
+    totalPrice = 0,
+    totalQty = 0,
+    updateCartQty = () => {},
+    removeFromCart = () => {},
+    clearCart = async () => {},
+    isLoading = false,
+    isSyncing = false
   } = useCart();
 
   const { user } = useAuth() || {};
   const customerEmail = user?.email || "";
-  
+  const canSeeEngPricing = user?.role === "admin" || user?.role === "engineer";
+
   const PAYSTACK_PUBLIC_KEY = "pk_live_73d373180bd0c70bd6baf9bf603136691f7b1867";
   const ADMIN_WHATSAPP_NUMBER = "2347069383526";
 
-  const deliveryFee = totalPrice > 15000 ? 0 : 2500;
-  const grandTotal = totalPrice + deliveryFee;
-
+  const [backendPricing, setBackendPricing] = useState({});
   const [isPaid, setIsPaid] = useState(false);
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState("");
-  const [showMobileForm, setShowMobileForm] = useState(false); // For mobile sticky form
+  const [showMobileForm, setShowMobileForm] = useState(false);
+
+  // ✅ Coin states
+  const [userCoins, setUserCoins] = useState(0);
+  const [useCoins, setUseCoins] = useState(false);
+  const [coinsToUse, setCoinsToUse] = useState(0);
 
   const [shippingInfo, setShippingInfo] = useState({
-    fullName: "",
-    street: "",
-    apartment: "",
-    city: "",
-    state: "",
-    zipCode: "",
-    country: "Nigeria",
-    phone: "",
+    fullName: "", street: "", apartment: "", city: "",
+    state: "", zipCode: "", country: "Nigeria", phone: "",
   });
 
   const handleShippingChange = (e) => {
     setShippingInfo({ ...shippingInfo, [e.target.name]: e.target.value });
   };
 
+  // ✅ Fetch user coin balance
+  useEffect(() => {
+    if (user) {
+      const fetchCoins = async () => {
+        try {
+          const { data } = await api.get("/payments/balance");
+          setUserCoins(data.coins || 0);
+        } catch (error) {
+          console.error("Failed to fetch coin balance");
+        }
+      };
+      fetchCoins();
+    }
+  }, [user]);
+
+  useEffect(() => {
+    const fetchPricing = async () => {
+      try {
+        const response = await api.get('/products/discount-prices');
+        if (response.data) {
+          const pricingMap = {};
+          response.data.forEach((p) => {
+            pricingMap[p._id] = {
+              price: p.price,
+              discountPrice: p.discountPrice,
+              engineeringPrice: p.engineeringPrice
+            };
+          });
+          setBackendPricing(pricingMap);
+        }
+      } catch (error) {
+        console.error('Error fetching pricing data:', error);
+      }
+    };
+    if (cart.length > 0) fetchPricing();
+  }, [cart]);
+
+  const validatedCart = cart.map(item => {
+    const productId = item.product?._id || item.product || item._id;
+    const backendData = backendPricing[productId];
+    return {
+      ...item,
+      price: backendData?.price !== undefined ? backendData.price : item.price,
+      discountPrice: backendData?.discountPrice !== undefined ? backendData.discountPrice : item.discountPrice,
+      engineeringPrice: backendData?.engineeringPrice !== undefined ? backendData.engineeringPrice : item.engineeringPrice
+    };
+  });
+
+  const safeSubtotal = validatedCart.reduce((sum, item) => {
+    return sum + (getEffectivePrice(item, canSeeEngPricing) * (Number(item.quantity) || 1));
+  }, 0);
+
+  const totalSavings = validatedCart.reduce((sum, item) => {
+    const price = Number(item.price) || 0;
+    const effectivePrice = getEffectivePrice(item, canSeeEngPricing);
+    if (effectivePrice > 0 && effectivePrice < price) {
+      return sum + ((price - effectivePrice) * (Number(item.quantity) || 1));
+    }
+    return sum;
+  }, 0);
+
+  const deliveryFee = safeSubtotal > 15000 ? 0 : 2500;
+  const grandTotal = safeSubtotal + deliveryFee;
+
+  // ✅ Coin calculations
+  const maxApplicableCoins = Math.min(userCoins, Math.floor(grandTotal / 100));
+  const canPayFullyWithCoins = userCoins * 100 >= grandTotal;
+
+  useEffect(() => {
+    if (coinsToUse > maxApplicableCoins) {
+      setCoinsToUse(maxApplicableCoins);
+    }
+  }, [maxApplicableCoins, coinsToUse]);
+
+  const coinDiscount = coinsToUse * 100;
+  const amountToPay = grandTotal - coinDiscount;
+  const coinsEarned = Math.floor(amountToPay / 10000);
+
   const getProductId = (item) => item.product?._id || item.product;
 
   const buildWhatsAppMessage = () => {
     let message = "Hello, I'd like to place an order:\n\n";
-    cart.forEach((item, index) => {
+    validatedCart.forEach((item, index) => {
+      const effectivePrice = getEffectivePrice(item, canSeeEngPricing);
+      const safeQuantity = Number(item.quantity) || 1;
       message += `*${index + 1}. ${item.name}*\n`;
-      message += `   Qty: ${item.quantity}  •  Price: ₦${(item.price * item.quantity).toLocaleString()}\n\n`;
+      message += `   Qty: ${safeQuantity}  •  Price: ₦${(effectivePrice * safeQuantity).toLocaleString()}\n\n`;
     });
     message += "____________________\n\n";
-    message += `*Subtotal:* ₦${totalPrice.toLocaleString()}\n`;
+    message += `*Subtotal:* ₦${safeSubtotal.toLocaleString()}\n`;
     message += `*Delivery Fee:* ${deliveryFee === 0 ? "FREE" : "₦2,500"}\n`;
-    message += `*Grand Total:* ₦${grandTotal.toLocaleString()}\n\n`;
+    if (coinDiscount > 0) {
+      message += `*Coin Discount:* -₦${coinDiscount.toLocaleString()} (${coinsToUse} coins)\n`;
+    }
+    message += `*Total to Pay:* ₦${amountToPay.toLocaleString()}\n\n`;
     message += "*Delivery Details:*\n";
     message += `Name: ${shippingInfo.fullName}\n`;
     message += `Address: ${shippingInfo.street}, ${shippingInfo.apartment}\n`;
@@ -70,7 +163,7 @@ export default function Cart() {
   };
 
   const validateShipping = () => {
-    if (!shippingInfo.fullName || !shippingInfo.street || !shippingInfo.city || 
+    if (!shippingInfo.fullName || !shippingInfo.street || !shippingInfo.city ||
         !shippingInfo.state || !shippingInfo.zipCode || !shippingInfo.phone) {
       setError("Please fill in all required delivery details.");
       return false;
@@ -79,54 +172,98 @@ export default function Cart() {
     return true;
   };
 
+  const buildOrderPayload = (paymentMethod, paystackReference) => ({
+    items: validatedCart.map((item) => ({
+      product: getProductId(item),
+      name: item.name,
+      image: item.image,
+      price: getEffectivePrice(item, canSeeEngPricing),
+      originalPrice: Number(item.price) || 0,
+      engineeringPrice: Number(item.engineeringPrice) || undefined,
+      quantity: Number(item.quantity) || 1,
+    })),
+    subtotal: safeSubtotal,
+    deliveryFee,
+    total: grandTotal,
+    coinsUsed: coinsToUse,
+    coinDiscount: coinDiscount,
+    amountPaid: amountToPay,
+    paymentMethod,
+    paystackReference: paystackReference || undefined,
+    shippingAddress: shippingInfo,
+  });
+
+  // ✅ Full coin payment handler
+  const handleFullCoinPayment = async () => {
+    if (placing) return;
+    if (!validateShipping()) return setShowMobileForm(true);
+
+    setPlacing(true);
+    setError("");
+    try {
+      // Use all applicable coins for full payment
+      const fullCoinsNeeded = Math.ceil(grandTotal / 100);
+      const coinsForPayment = Math.min(userCoins, fullCoinsNeeded);
+
+      const orderData = {
+        items: validatedCart.map((item) => ({
+          product: getProductId(item),
+          name: item.name,
+          image: item.image,
+          price: getEffectivePrice(item, canSeeEngPricing),
+          originalPrice: Number(item.price) || 0,
+          engineeringPrice: Number(item.engineeringPrice) || undefined,
+          quantity: Number(item.quantity) || 1,
+        })),
+        subtotal: safeSubtotal,
+        deliveryFee,
+        total: grandTotal,
+        coinsUsed: coinsForPayment,
+        coinDiscount: coinsForPayment * 100,
+        amountPaid: 0,
+        paymentMethod: "coins",
+        paystackReference: undefined,
+        shippingAddress: shippingInfo,
+      };
+
+      await api.post("/orders", orderData);
+      await clearCart();
+      setIsPaid(true);
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to place order with coins.");
+    } finally {
+      setPlacing(false);
+    }
+  };
+
   const handleWhatsAppOrder = async () => {
     if (placing) return;
     if (!validateShipping()) return setShowMobileForm(true);
 
     setPlacing(true);
     setError("");
-
     try {
       const message = buildWhatsAppMessage();
       window.open(`https://wa.me/${ADMIN_WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`, "_blank");
-
       try {
         const orderData = buildOrderPayload("whatsapp", null);
         await api.post("/orders", orderData);
       } catch (saveErr) {
         console.warn("Order not saved to DB, but WhatsApp opened:", saveErr);
       }
-
-      await clearCart(); 
+      await clearCart();
       setIsPaid(true);
     } catch (err) {
-      console.error("WhatsApp order error:", err);
-      setError(err.response?.data?.message || "Something went wrong. Please try again.");
+      setError(err.response?.data?.message || "Something went wrong.");
     } finally {
       setPlacing(false);
     }
   };
 
-  const buildOrderPayload = (paymentMethod, paystackReference) => ({
-    items: cart.map((item) => ({
-      product: getProductId(item),
-      name: item.name,
-      image: item.image,
-      price: item.price,
-      quantity: item.quantity,
-    })),
-    subtotal: totalPrice,
-    deliveryFee,
-    total: grandTotal,
-    paymentMethod,
-    paystackReference: paystackReference || undefined,
-    shippingAddress: shippingInfo,
-  });
-
   const paystackConfig = {
     reference: (new Date()).getTime().toString(),
     email: customerEmail || "no-email@provided.com",
-    amount: grandTotal * 100,
+    amount: amountToPay * 100,
     publicKey: PAYSTACK_PUBLIC_KEY,
     currency: "NGN",
     metadata: {
@@ -134,7 +271,7 @@ export default function Cart() {
         {
           display_name: "Cart Items",
           variable_name: "cart_items",
-          value: cart.map(item => `${item.name} (x${item.quantity})`).join(', ')
+          value: validatedCart.map(item => `${item.name} (x${item.quantity})`).join(', ')
         }
       ]
     }
@@ -157,15 +294,12 @@ export default function Cart() {
   const onSuccess = async (reference) => {
     setPlacing(true);
     setError("");
-
     try {
       const orderData = buildOrderPayload("paystack", reference.reference);
       await api.post("/orders", orderData);
-
-      await clearCart(); 
+      await clearCart();
       setIsPaid(true);
     } catch (err) {
-      console.error("Failed to save Paystack order:", err);
       setError(err.response?.data?.message || "Payment received but order save failed.");
       setIsPaid(true);
     } finally {
@@ -209,6 +343,13 @@ export default function Cart() {
     );
   }
 
+  const savingsLabel = canSeeEngPricing && validatedCart.some(i => Number(i.engineeringPrice) > 0 && Number(i.engineeringPrice) < Number(i.price))
+    ? "engineer pricing"
+    : "discounted prices";
+
+  // ✅ Calculate coins needed for full payment
+  const coinsNeededForFullPayment = Math.ceil(grandTotal / 100);
+
   return (
     <div className="cart-page">
       {isSyncing && (
@@ -229,62 +370,236 @@ export default function Cart() {
             </span>
           </div>
 
-          {cart.map((item) => {
+          <Point />
+
+          {validatedCart.map((item) => {
             const productId = getProductId(item);
+            const safePrice = Number(item.price) || 0;
+            const safeEngineeringPrice = Number(item.engineeringPrice) || 0;
+            const effectivePrice = getEffectivePrice(item, canSeeEngPricing);
+            const safeQuantity = Number(item.quantity) || 1;
+            const itemTotal = effectivePrice * safeQuantity;
+            const hasDiscount = effectivePrice < safePrice;
+            const isEngPrice = canSeeEngPricing && safeEngineeringPrice > 0 && safeEngineeringPrice < safePrice;
+
             return (
               <div key={item._id} className="cart-item">
                 <Link to={`/product/${productId}`} className="cart-item-img">
                   <img src={item.image} alt={item.name} />
                 </Link>
-                
                 <div className="cart-item-details">
                   <div>
-                    <Link to={`/product/${productId}`} className="cart-item-name">
-                      {item.name}
-                    </Link>
+                    <Link to={`/product/${productId}`} className="cart-item-name">{item.name}</Link>
                     <p className="cart-item-sold">Sold by MallHub</p>
                   </div>
-                  
                   <div className="cart-item-bottom">
                     <div className="cart-qty-control">
-                      <button 
-                        onClick={() => updateCartQty(productId, item.quantity - 1)} 
-                        disabled={item.quantity <= 1 || isSyncing} 
-                        className="cart-qty-btn"
-                      >
+                      <button onClick={() => updateCartQty(productId, safeQuantity - 1)} disabled={safeQuantity <= 1 || isSyncing} className="cart-qty-btn">
                         <Icon icon="lucide:minus" width={14} />
                       </button>
-                      <span className="cart-qty-num">{item.quantity}</span>
-                      <button 
-                        onClick={() => updateCartQty(productId, item.quantity + 1)} 
-                        disabled={isSyncing} 
-                        className="cart-qty-btn"
-                      >
+                      <span className="cart-qty-num">{safeQuantity}</span>
+                      <button onClick={() => updateCartQty(productId, safeQuantity + 1)} disabled={isSyncing} className="cart-qty-btn">
                         <Icon icon="lucide:plus" width={14} />
                       </button>
                     </div>
-                    <span className="cart-item-total">₦{(item.price * item.quantity).toLocaleString()}</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                      {hasDiscount && (
+                        <span style={{ fontSize: '12px', color: '#999', textDecoration: 'line-through', marginBottom: '2px' }}>
+                          ₦{(safePrice * safeQuantity).toLocaleString()}
+                        </span>
+                      )}
+                      <span className="cart-item-total">₦{itemTotal.toLocaleString()}</span>
+                      {hasDiscount && (
+                        <span style={{ fontSize: '11px', color: '#e8590c', marginTop: '1px' }}>
+                          ₦{effectivePrice.toLocaleString()} {isEngPrice ? 'eng. price' : 'each'}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
-
-                <button 
-                  onClick={() => removeFromCart(productId)} 
-                  className="cart-item-remove" 
-                  disabled={isSyncing}
-                  aria-label="Remove item"
-                >
+                <button onClick={() => removeFromCart(productId)} className="cart-item-remove" disabled={isSyncing} aria-label="Remove item">
                   <Icon icon="lucide:trash-2" width={18} />
                 </button>
               </div>
             );
           })}
+
+          {totalSavings > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', backgroundColor: '#d4edda', padding: '12px', borderRadius: '8px', marginBottom: '10px', marginTop: '10px' }}>
+              <Icon icon="lucide:tag" width={16} style={{ color: '#155724' }} />
+              <span style={{ marginLeft: '8px', color: '#155724', fontSize: '13px', fontWeight: '600' }}>
+                You're saving ₦{totalSavings.toLocaleString()} with {savingsLabel}!
+              </span>
+            </div>
+          )}
         </div>
 
-        {/* Right: Order Summary (Desktop) */}
+        {/* Right: Order Summary */}
         <div className="cart-summary-section">
           <div className="cart-summary-card">
             <h3>Order Summary</h3>
-            
+
+            <Point />
+
+            {/* ✅ Redeem Coins Section */}
+            {userCoins > 0 && (
+              <div style={{
+                background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
+                border: '1px solid #fcd34d',
+                borderRadius: '12px',
+                padding: '14px',
+                marginBottom: '12px',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{
+                      width: '32px', height: '32px', borderRadius: '50%',
+                      background: 'rgba(217, 119, 6, 0.15)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      <Icon icon="lucide:coins" width={16} color="#d97706" />
+                    </div>
+                    <div>
+                      <span style={{ fontWeight: 700, color: '#92400e', fontSize: '14px', display: 'block' }}>Loyalty Coins</span>
+                      <span style={{ fontSize: '11px', color: '#b45309' }}>
+                        {userCoins} coins available (₦{(userCoins * 100).toLocaleString()} value)
+                      </span>
+                    </div>
+                  </div>
+                  <label style={{
+                    display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer',
+                    background: useCoins ? '#d97706' : 'transparent',
+                    border: useCoins ? 'none' : '2px solid #d97706',
+                    borderRadius: '20px',
+                    padding: '5px 14px',
+                    transition: 'all 0.2s',
+                  }}>
+                    <input
+                      type="checkbox"
+                      checked={useCoins}
+                      onChange={(e) => {
+                        setUseCoins(e.target.checked);
+                        if (e.target.checked) setCoinsToUse(maxApplicableCoins);
+                        else setCoinsToUse(0);
+                      }}
+                      style={{ display: 'none' }}
+                    />
+                    <span style={{
+                      fontSize: '12px', fontWeight: 700,
+                      color: useCoins ? '#fff' : '#d97706',
+                    }}>
+                      {useCoins ? 'Applied' : 'Use Coins'}
+                    </span>
+                  </label>
+                </div>
+
+                {useCoins && (
+                  <div style={{ marginTop: '12px', paddingTop: '10px', borderTop: '1px solid #fde68a' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                      <span style={{ fontSize: '12px', color: '#92400e', fontWeight: 600 }}>How many coins to use?</span>
+                      <span style={{ fontSize: '12px', color: '#b45309', fontWeight: 700 }}>
+                        {coinsToUse} coin{coinsToUse !== 1 ? 's' : ''} = ₦{(coinsToUse * 100).toLocaleString()}
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max={maxApplicableCoins}
+                      value={coinsToUse}
+                      onChange={(e) => setCoinsToUse(parseInt(e.target.value, 10))}
+                      style={{ width: '100%', accentColor: '#d97706', height: '6px' }}
+                    />
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#92400e', marginTop: '4px' }}>
+                      <span>0</span>
+                      <span>{maxApplicableCoins} max</span>
+                    </div>
+
+                    {/* ✅ Quick action buttons for coin slider */}
+                    <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
+                      <button
+                        onClick={() => setCoinsToUse(0)}
+                        style={{
+                          flex: 1, padding: '5px', borderRadius: '6px', border: '1px solid #fde68a',
+                          background: 'white', color: '#92400e', fontSize: '11px', fontWeight: 600, cursor: 'pointer',
+                        }}
+                      >
+                        None
+                      </button>
+                      <button
+                        onClick={() => setCoinsToUse(Math.floor(maxApplicableCoins / 2))}
+                        style={{
+                          flex: 1, padding: '5px', borderRadius: '6px', border: '1px solid #fde68a',
+                          background: 'white', color: '#92400e', fontSize: '11px', fontWeight: 600, cursor: 'pointer',
+                        }}
+                      >
+                        Half
+                      </button>
+                      <button
+                        onClick={() => setCoinsToUse(maxApplicableCoins)}
+                        style={{
+                          flex: 1, padding: '5px', borderRadius: '6px', border: '1px solid #fde68a',
+                          background: 'white', color: '#92400e', fontSize: '11px', fontWeight: 600, cursor: 'pointer',
+                        }}
+                      >
+                        Max ({maxApplicableCoins})
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* ✅ "Buy Fully with Coins" CTA when user has enough */}
+                {canPayFullyWithCoins && !useCoins && (
+                  <div style={{
+                    marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #fde68a',
+                    textAlign: 'center',
+                  }}>
+                    <button
+                      onClick={() => {
+                        setUseCoins(true);
+                        setCoinsToUse(coinsNeededForFullPayment);
+                      }}
+                      style={{
+                        width: '100%', padding: '10px', borderRadius: '8px', border: 'none',
+                        background: 'linear-gradient(135deg, #d97706, #b45309)',
+                        color: '#fff', fontSize: '13px', fontWeight: 700, cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                        boxShadow: '0 2px 8px rgba(217, 119, 6, 0.3)',
+                      }}
+                    >
+                      <Icon icon="lucide:coins" width={16} />
+                      Buy Fully with {coinsNeededForFullPayment} Coins
+                    </button>
+                    <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#92400e' }}>
+                      No cash payment needed — ₦{grandTotal.toLocaleString()} covered!
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ✅ Show coin info even when user has 0 coins */}
+            {userCoins === 0 && user && (
+              <div style={{
+                background: '#f9fafb', border: '1px solid #e5e7eb',
+                borderRadius: '10px', padding: '10px 12px', marginBottom: '12px',
+                display: 'flex', alignItems: 'center', gap: '8px',
+              }}>
+                <Icon icon="lucide:coins" width={16} color="#9ca3af" />
+                <span style={{ fontSize: '12px', color: '#6b7280' }}>
+                  You have no loyalty coins yet. Earn 1 coin for every ₦10,000 spent!
+                </span>
+              </div>
+            )}
+
+            {coinsEarned > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', backgroundColor: '#fff3cd', padding: '10px', borderRadius: '8px', marginBottom: '12px' }}>
+                <Icon icon="lucide:coins" width={16} style={{ color: '#856404' }} />
+                <span style={{ marginLeft: '8px', color: '#856404', fontSize: '13px', fontWeight: '600' }}>
+                  You'll earn {coinsEarned} Coin{coinsEarned !== 1 ? 's' : ''} with this order!
+                </span>
+              </div>
+            )}
+
             <div className="cart-shipping-form">
               <h4 className="cart-shipping-title">
                 <Icon icon="lucide:map-pin" width={16} /> Delivery Details
@@ -302,19 +617,47 @@ export default function Cart() {
 
             <div className="cart-summary-row">
               <span>Subtotal ({totalQty} items)</span>
-              <span>₦{totalPrice.toLocaleString()}</span>
+              <span>₦{safeSubtotal.toLocaleString()}</span>
             </div>
+
+            {totalSavings > 0 && (
+              <div className="cart-summary-row text-green">
+                <span>Discount Savings</span>
+                <span>-₦{totalSavings.toLocaleString()}</span>
+              </div>
+            )}
+
             <div className="cart-summary-row">
               <span>Delivery Fee</span>
-              <span className={totalPrice > 15000 ? 'text-green' : ''}>
-                {totalPrice > 15000 ? 'FREE' : '₦2,500'}
+              <span className={safeSubtotal > 15000 ? 'text-green' : ''}>
+                {safeSubtotal > 15000 ? 'FREE' : '₦2,500'}
               </span>
             </div>
+
+            {coinsToUse > 0 && (
+              <div className="cart-summary-row" style={{ color: '#d97706', fontWeight: 600 }}>
+                <span>Coin Discount ({coinsToUse} coins)</span>
+                <span>-₦{coinDiscount.toLocaleString()}</span>
+              </div>
+            )}
+
             <div className="cart-summary-divider" />
+
             <div className="cart-summary-row cart-summary-total">
-              <span>Total</span>
-              <span>₦{grandTotal.toLocaleString()}</span>
+              <span>{amountToPay === 0 ? 'Fully Covered by Coins' : 'Amount to Pay'}</span>
+              <span style={{ color: amountToPay === 0 ? '#d97706' : undefined }}>
+                {amountToPay === 0 ? `₦${grandTotal.toLocaleString()}` : `₦${amountToPay.toLocaleString()}`}
+              </span>
             </div>
+
+            {amountToPay > 0 && coinsToUse > 0 && (
+              <div style={{
+                fontSize: '11px', color: '#6b7280', textAlign: 'right',
+                marginTop: '-4px', marginBottom: '8px',
+              }}>
+                You pay ₦{amountToPay.toLocaleString()} + {coinsToUse} coins
+              </div>
+            )}
 
             {error && (
               <div className="cart-error">
@@ -323,22 +666,46 @@ export default function Cart() {
               </div>
             )}
 
-            <button 
-              className="cart-checkout-btn" 
-              onClick={handlePaystackCheckout}
-              disabled={placing || isSyncing}
-            >
-              {placing || isSyncing ? (
-                <><Icon icon="lucide:loader-2" width={16} style={{ animation: 'spin 1s linear infinite' }} /> {placing ? 'Processing...' : 'Saving...'}</>
-              ) : (
-                <><Icon icon="lucide:lock" width={16} /> Pay ₦{grandTotal.toLocaleString()} Securely</>
-              )}
-            </button>
+            {/* ✅ Pay with Coins button (when fully covered) */}
+            {amountToPay === 0 && useCoins ? (
+              <button
+                className="cart-checkout-btn"
+                onClick={handleFullCoinPayment}
+                disabled={placing || isSyncing}
+                style={{
+                  background: placing || isSyncing
+                    ? '#9ca3af'
+                    : 'linear-gradient(135deg, #d97706, #b45309)',
+                }}
+              >
+                {placing || isSyncing ? (
+                  <><Icon icon="lucide:loader-2" width={16} style={{ animation: 'spin 1s linear infinite' }} /> Processing...</>
+                ) : (
+                  <><Icon icon="lucide:coins" width={16} /> Pay with {coinsToUse} Coins (₦{grandTotal.toLocaleString()})</>
+                )}
+              </button>
+            ) : (
+              <button
+                className="cart-checkout-btn"
+                onClick={handlePaystackCheckout}
+                disabled={placing || isSyncing || amountToPay < 0}
+              >
+                {placing || isSyncing ? (
+                  <><Icon icon="lucide:loader-2" width={16} style={{ animation: 'spin 1s linear infinite' }} /> Processing...</>
+                ) : (
+                  <>
+                    <Icon icon="lucide:lock" width={16} />
+                    Pay ₦{amountToPay.toLocaleString()} Securely
+                    {coinsToUse > 0 && <span style={{ opacity: 0.8, marginLeft: '4px' }}>+ {coinsToUse} coins</span>}
+                  </>
+                )}
+              </button>
+            )}
 
             <div className="cart-or-divider">OR</div>
 
-            <button 
-              onClick={handleWhatsAppOrder} 
+            <button
+              onClick={handleWhatsAppOrder}
               disabled={placing || isSyncing}
               className="cart-whatsapp-btn"
             >
@@ -378,21 +745,39 @@ export default function Cart() {
             <Icon icon="lucide:map-pin" width={16} />
             {showMobileForm ? 'Hide Details' : 'Delivery Details'}
           </button>
-          
           <div className="cart-mobile-btn-group">
-            <button 
-              onClick={handlePaystackCheckout}
-              disabled={placing || isSyncing}
-              className="cart-mobile-pay-btn"
-            >
-              {placing || isSyncing ? (
-                <Icon icon="lucide:loader-2" width={16} style={{ animation: 'spin 1s linear infinite' }} />
-              ) : (
-                <>₦{grandTotal.toLocaleString()}</>
-              )}
-            </button>
-            <button 
-              onClick={handleWhatsAppOrder} 
+            {amountToPay === 0 && useCoins ? (
+              <button
+                onClick={handleFullCoinPayment}
+                disabled={placing || isSyncing}
+                style={{
+                  padding: '10px 16px', borderRadius: '8px', border: 'none',
+                  background: placing ? '#9ca3af' : 'linear-gradient(135deg, #d97706, #b45309)',
+                  color: '#fff', fontWeight: 700, fontSize: '14px', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: '4px',
+                }}
+              >
+                {placing ? (
+                  <Icon icon="lucide:loader-2" width={16} style={{ animation: 'spin 1s linear infinite' }} />
+                ) : (
+                  <><Icon icon="lucide:coins" width={16} /> {coinsToUse} Coins</>
+                )}
+              </button>
+            ) : (
+              <button
+                onClick={handlePaystackCheckout}
+                disabled={placing || isSyncing}
+                className="cart-mobile-pay-btn"
+              >
+                {placing || isSyncing ? (
+                  <Icon icon="lucide:loader-2" width={16} style={{ animation: 'spin 1s linear infinite' }} />
+                ) : (
+                  <>₦{amountToPay.toLocaleString()}</>
+                )}
+              </button>
+            )}
+            <button
+              onClick={handleWhatsAppOrder}
               disabled={placing || isSyncing}
               className="cart-mobile-whatsapp-btn"
             >

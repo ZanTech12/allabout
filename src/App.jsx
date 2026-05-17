@@ -11,10 +11,13 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Cart from './pages/Cart';
 import AdminDashboard from './pages/admin/Dashboard';
+import MessagesPage from './pages/admin/MessagesPage'; // ✅ Updated to import MessagesPage
 import ProductDetail from "./pages/ProductDetail";
 import TrackOrder from "./pages/TrackOrder";
 import MyOrdersPage from "./pages/MyOrdersPage";
-import ScrollToTop from './ScrollToTop'; // ✅ Imported from the new file
+import Rewards from "./pages/Rewards";
+import RegisterEngineer from "./pages/RegisterEngineer";
+import ScrollToTop from './ScrollToTop';
 import api from './api/axios';
 import './App.css';
 
@@ -58,7 +61,7 @@ function App() {
     <AuthProvider>
       <CartProvider>
         <Router>
-          <ScrollToTop /> {/* ✅ Automatically scrolls to top on route change */}
+          <ScrollToTop />
           <div className="app-layout">
             <Navbar />
             <main className="app-main">
@@ -69,9 +72,12 @@ function App() {
                 <Route path="/cart" element={<Cart />} />
                 <Route path="/product/:id" element={<ProductDetail />} />
                 <Route path="/admin/dashboard" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+                <Route path="/admin/messages" element={<AdminRoute><MessagesPage /></AdminRoute>} /> {/* ✅ Updated Route to use MessagesPage */}
                 
                 <Route path="/track-order" element={<TrackOrder />} />
                 <Route path="/my-orders" element={<ProtectedRoute><MyOrdersPage /></ProtectedRoute>} />
+                <Route path="/rewards" element={<Rewards/>} /> 
+                <Route path="/register-engineer" element={<RegisterEngineer />} />
               </Routes>
             </main>
 

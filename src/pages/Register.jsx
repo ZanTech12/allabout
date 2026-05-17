@@ -266,6 +266,15 @@ export default function Register() {
             <p className="auth-switch-text">
               Already have an account? <Link to="/login" className="auth-switch-link">Login</Link>
             </p>
+
+            {/* ✅ NEW: Engineer registration link */}
+            <div className="auth-engineer-link">
+              <Icon icon="lucide:wrench" width={14} />
+              <span>Are you an engineer?</span>
+              <Link to="/register-engineer" className="auth-engineer-link__anchor">
+                Register with invite code
+              </Link>
+            </div>
           </div>
         )}
       </div>

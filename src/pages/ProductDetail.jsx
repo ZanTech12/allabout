@@ -6,6 +6,16 @@ import { useCart } from "../context/CartContext";
 import api from "../api/axios";
 import "./ProductDetail.css";
 
+// ✅ Helper to safely get all product images as an array
+const getProductImages = (p) => {
+  if (Array.isArray(p.images) && p.images.length > 0) {
+    const valid = p.images.filter((img) => img && img.trim());
+    if (valid.length > 0) return valid;
+  }
+  if (p.image && p.image.trim()) return [p.image];
+  return [];
+};
+
 export default function ProductDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -23,6 +33,7 @@ export default function ProductDetail() {
       try {
         const { data } = await api.get(`/products/${id}`);
         setProduct(data);
+        setActiveImg(0); // Reset image index on product change
       } catch (err) {
         setError(err.response?.data?.message || "Product not found");
       } finally {
@@ -46,14 +57,17 @@ export default function ProductDetail() {
 
   const handleAddToCart = () => {
     if (!product || product.countInStock === 0) return;
+    
+    // ✅ Get images array for the cart item
+    const allImages = getProductImages(product);
 
     for (let i = 0; i < qty; i++) {
       addToCart({
-        product: product._id,
+        _id: product._id,
         name: product.name,
-        image:
-          product.image || `https://picsum.photos/seed/${product._id}/300/300`,
-        price: product.discountPrice || product.price,
+        image: allImages[0] || `https://picsum.photos/seed/${product._id}/300/300`, // ✅ Use primary image from array
+        price: product.price,
+        discountPrice: product.discountPrice,
         countInStock: product.countInStock,
       });
     }
@@ -62,7 +76,28 @@ export default function ProductDetail() {
     setTimeout(() => setAddedFeedback(false), 2000);
   };
 
-  const currentPrice = product?.discountPrice || product?.price;
+  const currentPrice = product?.discountPrice && product?.discountPrice < product?.price 
+    ? product.discountPrice 
+    : product?.price;
+
+  // ✅ Image gallery navigation handlers
+  const allImages = product ? getProductImages(product) : [];
+  const hasMultipleImages = allImages.length > 1;
+  
+  // Fallback if no images exist at all
+  const images = allImages.length > 0 
+    ? allImages 
+    : [`https://picsum.photos/seed/${product?._id || 'default'}/600/600`];
+
+  const handlePrevImg = (e) => {
+    e.stopPropagation();
+    setActiveImg((prev) => (prev - 1 + images.length) % images.length);
+  };
+
+  const handleNextImg = (e) => {
+    e.stopPropagation();
+    setActiveImg((prev) => (prev + 1) % images.length);
+  };
 
   if (loading) {
     return (
@@ -92,12 +127,6 @@ export default function ProductDetail() {
       </div>
     );
   }
-
-  const images = product.images?.length
-    ? product.images
-    : [
-        product.image || `https://picsum.photos/seed/${product._id}/600/600`,
-      ];
 
   return (
     <div className="pd-page">
@@ -137,7 +166,31 @@ export default function ProductDetail() {
             {product.countInStock === 0 && (
               <span className="pd-oos-badge">OUT OF STOCK</span>
             )}
+            
             <img src={images[activeImg]} alt={product.name} />
+
+            {/* ✅ NEW: Image Navigation Arrows & Counter */}
+            {hasMultipleImages && (
+              <>
+                <button 
+                  className="pd-gallery-nav pd-gallery-nav--prev" 
+                  onClick={handlePrevImg} 
+                  aria-label="Previous image"
+                >
+                  <Icon icon="lucide:chevron-left" width={24} />
+                </button>
+                <button 
+                  className="pd-gallery-nav pd-gallery-nav--next" 
+                  onClick={handleNextImg} 
+                  aria-label="Next image"
+                >
+                  <Icon icon="lucide:chevron-right" width={24} />
+                </button>
+                <span className="pd-img-counter">
+                  {activeImg + 1} / {images.length}
+                </span>
+              </>
+            )}
           </div>
         </div>
 
@@ -169,7 +222,7 @@ export default function ProductDetail() {
 
           <div className="pd-price-block">
             <span className="pd-price">₦{currentPrice?.toLocaleString()}</span>
-            {product.discountPrice && product.price && (
+            {product.discountPrice && product.price && product.discountPrice < product.price && (
               <>
                 <span className="pd-old-price">
                   ₦{product.price.toLocaleString()}
@@ -182,7 +235,7 @@ export default function ProductDetail() {
           </div>
 
           {/* Flash sale bar if discounted */}
-          {product.discountPrice && product.price && (
+          {product.discountPrice && product.price && product.discountPrice < product.price && (
             <div className="pd-flash-bar">
               <span className="pd-flash-bar__label">Flash Deal</span>
               <div className="pd-flash-bar__track">
@@ -293,6 +346,77 @@ export default function ProductDetail() {
           )}
         </div>
       </div>
+
+      {/* ✅ NEW: Scoped CSS for Image Gallery Navigation */}
+      <style>{`
+        .pd-main-img {
+          position: relative;
+        }
+
+        .pd-gallery-nav {
+          position: absolute;
+          top: 50%;
+          transform: translateY(-50%);
+          width: 40px;
+          height: 40px;
+          border-radius: 50%;
+          background: rgba(255, 255, 255, 0.92);
+          border: 1px solid rgba(0, 0, 0, 0.06);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          z-index: 3;
+          opacity: 0;
+          transition: opacity 0.2s ease, background 0.15s ease, box-shadow 0.15s ease;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+          color: #343a40;
+        }
+
+        .pd-main-img:hover .pd-gallery-nav {
+          opacity: 1;
+        }
+
+        /* Always show on touch devices */
+        @media (hover: none) and (pointer: coarse) {
+          .pd-gallery-nav {
+            opacity: 0.85;
+          }
+        }
+
+        .pd-gallery-nav:hover {
+          background: #fff;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .pd-gallery-nav:active {
+          transform: translateY(-50%) scale(0.93);
+        }
+
+        .pd-gallery-nav--prev {
+          left: 12px;
+        }
+
+        .pd-gallery-nav--next {
+          right: 12px;
+        }
+
+        .pd-img-counter {
+          position: absolute;
+          bottom: 12px;
+          right: 12px;
+          background: rgba(0, 0, 0, 0.6);
+          color: #fff;
+          font-size: 0.75rem;
+          font-weight: 600;
+          padding: 4px 10px;
+          border-radius: 12px;
+          z-index: 3;
+          letter-spacing: 0.5px;
+          backdrop-filter: blur(4px);
+          -webkit-backdrop-filter: blur(4px);
+        }
+      `}</style>
     </div>
   );
 }

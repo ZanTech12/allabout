@@ -1273,3 +1273,27 @@
     max-width: 100%;
   }
 }
+/* ── Engineer registration link ── */
+.auth-engineer-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px dashed #e9ecef;
+  font-size: 0.82rem;
+  color: #868e96;
+}
+
+.auth-engineer-link__anchor {
+  color: #f68b1e;
+  font-weight: 600;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.auth-engineer-link__anchor:hover {
+  color: #e8590c;
+  text-decoration: underline;
+}

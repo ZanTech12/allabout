@@ -14,7 +14,9 @@ import {
   Bell,
   ChevronDown,
   Shield,
-  ClipboardList // ✅ ADDED for All Orders
+  ClipboardList, 
+  MessageSquare,
+  KeyRound // ✅ ADDED for Invite Tokens
 } from "lucide-react";
 
 import ProductsPage from "./ProductsPage";
@@ -22,7 +24,9 @@ import CategoriesPage from "./CategoriesPage";
 import SiteSettingsPage from "./SiteSettingsPage";
 import UsersPage from "./UsersPage";
 import TrackOrderPage from "./TrackOrder"; 
-import AllOrders from "./AllOrders"; // ✅ ADDED
+import AllOrders from "./AllOrders"; 
+import MessagesPage from "./MessagesPage"; 
+import InviteTokensPage from "./InviteTokensPage"; // ✅ ADDED for Invite Tokens
 // import AppearancePage from "./AppearancePage"; // <-- Uncomment when you create this page
 import api from "../../api/axios";
 import "./Dashboard.css";
@@ -58,8 +62,10 @@ export default function AdminDashboard() {
     { key: "products", label: "Products", icon: Box, description: "Manage inventory" },
     { key: "categories", label: "Categories", icon: Tags, description: "Organize catalog" },
     { key: "users", label: "Users", icon: Users, description: "Manage accounts" },
+    { key: "invite-tokens", label: "Invite Tokens", icon: KeyRound, description: "Engineer registrations" }, // ✅ ADDED
     { key: "track-order", label: "Track Order", icon: ChevronRight, description: "Track & update orders" }, 
-    { key: "all-orders", label: "All Orders", icon: ClipboardList, description: "View recent orders" }, // ✅ ADDED
+    { key: "all-orders", label: "All Orders", icon: ClipboardList, description: "View recent orders" }, 
+    { key: "messages", label: "Messages", icon: MessageSquare, description: "Contact form messages" }, 
     { key: "appearance", label: "Appearance & Media", icon: Palette, description: "Theme & uploads" },
     { key: "settings", label: "Site Settings", icon: Settings, description: "Configuration" },
   ];
@@ -297,8 +303,10 @@ export default function AdminDashboard() {
           {activePage === "products" && <ProductsPage />}
           {activePage === "categories" && <CategoriesPage />}
           {activePage === "users" && <UsersPage />}
+          {activePage === "invite-tokens" && <InviteTokensPage />} {/* ✅ ADDED */}
           {activePage === "track-order" && <TrackOrderPage />} 
-          {activePage === "all-orders" && <AllOrders />} {/* ✅ ADDED */}
+          {activePage === "all-orders" && <AllOrders />} 
+          {activePage === "messages" && <MessagesPage />} 
           {activePage === "appearance" && (
             <div className="dashboard-placeholder-page">
               <h2>Appearance & Media</h2>

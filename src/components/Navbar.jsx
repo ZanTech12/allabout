@@ -4,6 +4,7 @@ import { useCart } from "../context/CartContext";
 import { Icon } from "@iconify/react";
 import { useState, useEffect, useRef } from "react";
 import api from "../api/axios";
+import Point from "../pages/Point";
 
 export default function Navbar() {
   const { user, logout } = useAuth();
@@ -85,7 +86,6 @@ export default function Navbar() {
   const handleSearch = (e) => {
     e.preventDefault();
     if (searchQuery.trim()) {
-      // ✅ UPDATED: Navigate to Home page with search query
       navigate(`/?search=${encodeURIComponent(searchQuery.trim())}`);
       setSearchQuery(""); setShowMobileSearch(false); closeMobile();
     }
@@ -1128,7 +1128,7 @@ export default function Navbar() {
            ═══════════════════════════════════════════ */
         @media (max-width: 991.98px) {
           .nb__actions { display: none; }
-          .nb__search { display: none; } 
+          .nb__search { display: none; }
           .nb__mobile-actions { display: flex; }
           .nb__logo-img-wrapper { width: 42px; height: 42px; border-radius: 13px; }
           .nb__logo-img-wrapper img { border-radius: 10.5px; }
@@ -1140,17 +1140,17 @@ export default function Navbar() {
         @media (max-width: 767.98px) {
           .nb__topbar { display: none; }
           .nb__main-inner { padding: 8px 12px; gap: 8px; height: 58px; }
-          
+
           .nb__logo-text-group { display: flex; }
-          .nb__logo-tagline { display: none; } 
+          .nb__logo-tagline { display: none; }
           .nb__logo-name { font-size: 1.05rem; }
-          
+
           .nb__logo-img-wrapper { width: 36px; height: 36px; border-radius: 10px; padding: 2px; }
           .nb__logo-img-wrapper img { border-radius: 8px; }
           .nb__logo-badge-dot { width: 8px; height: 8px; border-width: 2px; top: -1px; right: -1px; }
-          
+
           .nb__mobile-icon { width: 38px; height: 38px; border-radius: 10px; }
-          
+
           .nb__bottom-nav { padding: 4px 4px; padding-bottom: calc(4px + env(safe-area-inset-bottom, 0px)); }
           .nb__bottom-item { padding: 2px 8px; font-size: 0.6rem; }
           .nb__bottom-icon-wrap { width: 34px; height: 34px; border-radius: 10px; }
@@ -1170,6 +1170,10 @@ export default function Navbar() {
               <Link to="/help" className="nb__topbar-link"><Icon icon="lucide:help-circle" width={13} /><span>Help & FAQ</span></Link>
               <Link to="/track-order" className="nb__topbar-link"><Icon icon="lucide:map-pin" width={13} /><span>Track Order</span></Link>
 
+              {user && (
+                <Link to="/rewards" className="nb__topbar-link"><Icon icon="lucide:coins" width={13} /><span>Coins</span></Link>
+              )}
+
               {user ? (
                 <div className="nb__user-dropdown" ref={dropdownRef}>
                   <button onClick={() => setDropdown(!dropdown)} className={`nb__user-btn ${dropdown ? "nb__user-btn--active" : ""}`}>
@@ -1188,6 +1192,7 @@ export default function Navbar() {
                     <Link to="/track-order" onClick={() => setDropdown(false)} className="nb__dropdown-item"><Icon icon="lucide:map-pin" width={16} /><span>Track Order</span></Link>
                     <Link to="/my-orders" onClick={() => setDropdown(false)} className="nb__dropdown-item"><Icon icon="lucide:package" width={16} /><span>My Orders</span></Link>
                     <Link to="/cart" onClick={() => setDropdown(false)} className="nb__dropdown-item"><Icon icon="lucide:shopping-cart" width={16} /><span>My Cart ({totalQty})</span></Link>
+                    <Link to="/rewards" onClick={() => setDropdown(false)} className="nb__dropdown-item"><Icon icon="lucide:coins" width={16} /><span>Coins</span></Link>
                     {user.role === "admin" && <Link to="/admin/dashboard" onClick={() => setDropdown(false)} className="nb__dropdown-item nb__dropdown-item--admin"><Icon icon="lucide:layout-dashboard" width={16} /><span>Admin Panel</span></Link>}
                     <div className="nb__dropdown-divider" />
                     <button onClick={handleLogout} className="nb__dropdown-item nb__dropdown-item--logout"><Icon icon="lucide:log-out" width={16} /><span>Sign Out</span></button>
@@ -1235,6 +1240,12 @@ export default function Navbar() {
 
             {/* DESKTOP ACTIONS */}
             <div className="nb__actions">
+              {user && (
+                <Link to="/rewards" className="nb__action">
+                  <div className="nb__action-icon"><Icon icon="lucide:coins" width={20} /></div>
+                  <span className="nb__action-label">Coins</span>
+                </Link>
+              )}
               <Link to="/wishlist" className="nb__action">
                 <div className="nb__action-icon"><Icon icon="lucide:heart" width={20} /></div>
                 <span className="nb__action-label">Wishlist</span>
@@ -1274,14 +1285,13 @@ export default function Navbar() {
           <p className="nb__search-suggestions__title">Popular Searches</p>
           <div className="nb__search-suggestions__list">
             {["iPhone 15", "Samsung Galaxy", "AirPods", "Laptop", "Nike Shoes"].map((t) => (
-              <button 
-                key={t} 
-                onClick={() => { 
-                  setSearchQuery(t); 
-                  // ✅ UPDATED: Navigate to Home page with search query
-                  navigate(`/?search=${encodeURIComponent(t)}`); 
-                  setShowMobileSearch(false); 
-                }} 
+              <button
+                key={t}
+                onClick={() => {
+                  setSearchQuery(t);
+                  navigate(`/?search=${encodeURIComponent(t)}`);
+                  setShowMobileSearch(false);
+                }}
                 className="nb__search-suggestion-chip"
               >
                 <Icon icon="lucide:trending-up" width={13} />{t}
@@ -1315,13 +1325,17 @@ export default function Navbar() {
           )}
          <nav className="nb__drawer-nav">
   <Link to="/" onClick={closeMobile} className="nb__drawer-link"><Icon icon="lucide:home" width={19} /><span>Home</span><Icon icon="lucide:chevron-right" width={16} className="nb__drawer-link-arrow" /></Link>
-  <Link to="/products" onClick={closeMobile} className="nb__drawer-link"><Icon icon="lucide:grid-3x3" width={19} /><span>All Products</span><Icon icon="lucide:chevron-right" width={16} className="nb__drawer-link-arrow" /></Link>
+  <Link to="/products" onClick={closeMobile} className="nb__drawer-link">
+    <Icon icon="lucide:grid-3x3" width={19} /><span>All Products</span><Icon icon="lucide:chevron-right" width={16} className="nb__drawer-link-arrow" />
+  </Link>
   <Link to="/track-order" onClick={closeMobile} className="nb__drawer-link"><Icon icon="lucide:map-pin" width={19} /><span>Track Order</span><Icon icon="lucide:chevron-right" width={16} className="nb__drawer-link-arrow" /></Link>
   <Link to="/my-orders" onClick={closeMobile} className="nb__drawer-link"><Icon icon="lucide:package" width={19} /><span>My Orders</span><Icon icon="lucide:chevron-right" width={16} className="nb__drawer-link-arrow" /></Link>
   <Link to="/cart" onClick={closeMobile} className="nb__drawer-link"><Icon icon="lucide:shopping-cart" width={19} /><span>My Cart ({totalQty})</span><Icon icon="lucide:chevron-right" width={16} className="nb__drawer-link-arrow" /></Link>
+  {user && (
+    <Link to="/rewards" onClick={closeMobile} className="nb__drawer-link"><Icon icon="lucide:coins" width={19} /><span>Coins</span><Icon icon="lucide:chevron-right" width={16} className="nb__drawer-link-arrow" /></Link>
+  )}
   <Link to="/help" onClick={closeMobile} className="nb__drawer-link"><Icon icon="lucide:help-circle" width={19} /><span>Help Center</span><Icon icon="lucide:chevron-right" width={16} className="nb__drawer-link-arrow" /></Link>
-  
-  {/* ✅ ADMIN ONLY LINK FOR MOBILE DRAWER */}
+
   {user?.role === "admin" && (
     <Link to="/admin/dashboard" onClick={closeMobile} className="nb__drawer-link">
       <Icon icon="lucide:layout-dashboard" width={19} />
@@ -1357,6 +1371,7 @@ export default function Navbar() {
               <Link to="/track-order" onClick={() => setProfileSheet(false)}><Icon icon="lucide:map-pin" width={20} /><span>Track Order</span><Icon icon="lucide:chevron-right" width={18} /></Link>
               <Link to="/my-orders" onClick={() => setProfileSheet(false)}><Icon icon="lucide:package" width={20} /><span>My Orders</span><Icon icon="lucide:chevron-right" width={18} /></Link>
               <Link to="/cart" onClick={() => setProfileSheet(false)}><Icon icon="lucide:shopping-cart" width={20} /><span>My Cart ({totalQty})</span><Icon icon="lucide:chevron-right" width={18} /></Link>
+              <Link to="/rewards" onClick={() => setProfileSheet(false)}><Icon icon="lucide:coins" width={20} /><span>Coins (<Point />)</span><Icon icon="lucide:chevron-right" width={18} /></Link>
               {user.role === "admin" && <Link to="/admin/dashboard" onClick={() => setProfileSheet(false)} className="nb__profile-sheet__admin"><Icon icon="lucide:layout-dashboard" width={20} /><span>Admin Dashboard</span><Icon icon="lucide:chevron-right" width={18} /></Link>}
             </div>
             <button onClick={() => { handleLogout(); setProfileSheet(false); }} className="nb__profile-sheet__logout"><Icon icon="lucide:log-out" width={20} /> Sign Out</button>
@@ -1368,6 +1383,12 @@ export default function Navbar() {
       <nav className="nb__bottom-nav">
         <Link to="/" className="nb__bottom-item"><div className="nb__bottom-icon-wrap"><Icon icon="lucide:home" width={21} /></div><span>Home</span></Link>
         <Link to="/products" className="nb__bottom-item"><div className="nb__bottom-icon-wrap"><Icon icon="lucide:grid-3x3" width={21} /></div><span>Categories</span></Link>
+        {user && (
+          <Link to="/rewards" className="nb__bottom-item">
+            <div className="nb__bottom-icon-wrap"><Icon icon="lucide:coins" width={21} /></div>
+            <span>Coins</span>
+          </Link>
+        )}
         <Link to="/cart" className="nb__bottom-item nb__bottom-item--cart">
           <div className="nb__bottom-icon-wrap">
             <Icon icon="lucide:shopping-cart" width={21} />

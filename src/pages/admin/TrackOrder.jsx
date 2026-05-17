@@ -13,7 +13,7 @@ const STATUS_FLOW = [
 ];
 
 const ALL_STATUSES = [
-  ...STATUS_FLOW.map(s => s.key),
+  ...STATUS_FLOW.map((s) => s.key),
   "cancelled",
   "returned",
 ];
@@ -25,7 +25,6 @@ const TABS = [
   { key: "email", label: "Email Address", placeholder: "e.g. you@example.com", icon: "lucide:mail" },
 ];
 
-// ✅ NEW: Defines the next logical step for Quick Actions
 const getNextStatus = (currentStatus) => {
   const flow = {
     pending: { key: "confirmed", label: "Confirm Order", icon: "lucide:check-circle", color: "#3b82f6" },
@@ -51,6 +50,9 @@ export default function AdminTrackOrder() {
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState("");
 
+  // ✅ NEW: Track coins credited from the last action
+  const [coinsInfo, setCoinsInfo] = useState(null);
+
   const handleInputChange = (key, value) => {
     setInputs((prev) => ({ ...prev, [key]: value }));
     if (error) setError("");
@@ -69,6 +71,7 @@ export default function AdminTrackOrder() {
     setSearched(true);
     setEditMode(false);
     setSaveSuccess("");
+    setCoinsInfo(null);
     try {
       const params = { [activeTab]: value };
       const res = await api.get("/orders/track", { params });
@@ -96,26 +99,38 @@ export default function AdminTrackOrder() {
     });
     setEditMode(true);
     setSaveSuccess("");
+    setCoinsInfo(null);
   };
 
   const cancelEditMode = () => {
     setEditMode(false);
     setSaveSuccess("");
+    setCoinsInfo(null);
   };
 
-  // ✅ NEW: Quick Action Handler (Auto-generates tracking number on backend if needed)
+  // ✅ UPDATED: Quick Action Handler — now captures coinsCredited from response
   const handleQuickAction = async (nextStatus) => {
     if (!result) return;
     setSaving(true);
     setError("");
     setSaveSuccess("");
+    setCoinsInfo(null);
     try {
       const payload = { status: nextStatus };
       const res = await api.patch(`/orders/${result._id}/status`, payload);
       if (res.data.success) {
         setResult(res.data.order);
-        setSaveSuccess(`Order updated to ${nextStatus.replace(/_/g, ' ')}!`);
-        setTimeout(() => setSaveSuccess(""), 4000);
+        const coins = res.data.coinsCredited || 0;
+        if (coins > 0) {
+          setCoinsInfo(coins);
+          setSaveSuccess(`Order updated to ${nextStatus.replace(/_/g, " ")} — ${coins} loyalty coins credited!`);
+        } else {
+          setSaveSuccess(`Order updated to ${nextStatus.replace(/_/g, " ")}!`);
+        }
+        setTimeout(() => {
+          setSaveSuccess("");
+          setCoinsInfo(null);
+        }, 6000);
       } else {
         setError(res.data.message || "Failed to update.");
       }
@@ -126,11 +141,13 @@ export default function AdminTrackOrder() {
     }
   };
 
+  // ✅ UPDATED: Manual Save Handler — captures coinsCredited
   const handleSave = async (e) => {
     e.preventDefault();
     if (!result) return;
     setSaving(true);
     setSaveSuccess("");
+    setCoinsInfo(null);
     try {
       const payload = {};
       if (editForm.status) payload.status = editForm.status;
@@ -142,8 +159,17 @@ export default function AdminTrackOrder() {
       if (res.data.success) {
         setResult(res.data.order);
         setEditMode(false);
-        setSaveSuccess("Order updated successfully!");
-        setTimeout(() => setSaveSuccess(""), 4000);
+        const coins = res.data.coinsCredited || 0;
+        if (coins > 0) {
+          setCoinsInfo(coins);
+          setSaveSuccess(`Order updated — ${coins} loyalty coins credited to customer!`);
+        } else {
+          setSaveSuccess("Order updated successfully!");
+        }
+        setTimeout(() => {
+          setSaveSuccess("");
+          setCoinsInfo(null);
+        }, 6000);
       } else {
         setError(res.data.message || "Failed to update.");
       }
@@ -173,11 +199,14 @@ export default function AdminTrackOrder() {
     if (status === "cancelled") return { bg: "rgba(239,68,68,0.12)", text: "#f87171", border: "rgba(239,68,68,0.25)" };
     if (status === "returned") return { bg: "rgba(245,158,11,0.12)", text: "#fbbf24", border: "rgba(245,158,11,0.25)" };
     if (status === "delivered") return { bg: "rgba(16,185,129,0.12)", text: "#34d399", border: "rgba(16,185,129,0.25)" };
-    const step = STATUS_FLOW.find(s => s.key === status);
+    const step = STATUS_FLOW.find((s) => s.key === status);
     return step ? { bg: `${step.color}18`, text: step.color, border: `${step.color}40` } : { bg: "rgba(148,163,184,0.12)", text: "#94a3b8", border: "rgba(148,163,184,0.25)" };
   };
 
   const sc = result ? getStatusColor(result.status) : {};
+
+  // ✅ NEW: Calculate potential coins for this order
+  const potentialCoins = result ? Math.floor((result.totalAmount || 0) / 10000) : 0;
 
   return (
     <div style={{ padding: "24px", maxWidth: "960px", margin: "0 auto" }}>
@@ -258,6 +287,32 @@ export default function AdminTrackOrder() {
             {saveSuccess}
           </div>
         )}
+
+        {/* ✅ NEW: Coins Credited Banner */}
+        {coinsInfo && coinsInfo > 0 && (
+          <div style={{
+            display: "flex", alignItems: "center", gap: "10px",
+            padding: "14px 18px", borderRadius: "12px", marginTop: "14px",
+            background: "linear-gradient(135deg, rgba(251,191,36,0.08), rgba(245,158,11,0.12))",
+            border: "1px solid rgba(251,191,36,0.25)",
+          }}>
+            <div style={{
+              width: "36px", height: "36px", borderRadius: "50%",
+              background: "rgba(251,191,36,0.15)", display: "flex",
+              alignItems: "center", justifyContent: "center", flexShrink: 0,
+            }}>
+              <Icon icon="lucide:coins" width={18} color="#fbbf24" />
+            </div>
+            <div>
+              <p style={{ margin: 0, fontSize: "0.88rem", fontWeight: 700, color: "#fbbf24" }}>
+                +{coinsInfo} Loyalty Coins Credited
+              </p>
+              <p style={{ margin: "2px 0 0", fontSize: "0.78rem", color: "#94a3b8" }}>
+                Worth ₦{(coinsInfo * 100).toLocaleString()} — added to customer's wallet
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Not Found */}
@@ -301,18 +356,30 @@ export default function AdminTrackOrder() {
                   <Icon icon={isCancelled ? "lucide:x-circle" : isReturned ? "lucide:rotate-ccw" : result.status === "delivered" ? "lucide:badge-check" : "lucide:clock"} width={14} />
                   {result.status === "out_for_delivery" ? "Out for Delivery" : result.status?.charAt(0).toUpperCase() + result.status?.slice(1)}
                 </span>
-                
-                {/* ✅ NEW: Quick Action Button */}
+
+                {/* ✅ NEW: Coins status badge */}
+                {result.coinsCredited && (
+                  <span style={{
+                    display: "inline-flex", alignItems: "center", gap: "5px",
+                    padding: "5px 12px", borderRadius: "50px", fontSize: "0.72rem", fontWeight: 700,
+                    background: "rgba(251,191,36,0.1)", color: "#fbbf24",
+                    border: "1px solid rgba(251,191,36,0.2)",
+                  }}>
+                    <Icon icon="lucide:coins" width={12} /> {potentialCoins} coins earned
+                  </span>
+                )}
+
+                {/* Quick Action Button */}
                 {!editMode && getNextStatus(result.status) && (
-                  <button 
-                    onClick={() => handleQuickAction(getNextStatus(result.status).key)} 
+                  <button
+                    onClick={() => handleQuickAction(getNextStatus(result.status).key)}
                     disabled={saving}
-                    style={{ 
-                      display: "inline-flex", alignItems: "center", gap: "6px", padding: "7px 16px", borderRadius: "8px", 
-                      border: "none", background: getNextStatus(result.status).color, color: "#fff", 
-                      fontSize: "0.82rem", fontWeight: 700, cursor: saving ? "not-allowed" : "pointer", 
-                      transition: "all 0.2s", opacity: saving ? 0.7 : 1, 
-                      boxShadow: `0 2px 10px ${getNextStatus(result.status).color}44` 
+                    style={{
+                      display: "inline-flex", alignItems: "center", gap: "6px", padding: "7px 16px", borderRadius: "8px",
+                      border: "none", background: getNextStatus(result.status).color, color: "#fff",
+                      fontSize: "0.82rem", fontWeight: 700, cursor: saving ? "not-allowed" : "pointer",
+                      transition: "all 0.2s", opacity: saving ? 0.7 : 1,
+                      boxShadow: `0 2px 10px ${getNextStatus(result.status).color}44`,
                     }}
                   >
                     {saving ? <Icon icon="lucide:loader-2" width={14} style={{ animation: "spin 1s linear infinite" }} /> : <Icon icon={getNextStatus(result.status).icon} width={14} />}
@@ -327,6 +394,20 @@ export default function AdminTrackOrder() {
                 )}
               </div>
             </div>
+
+            {/* ✅ NEW: Coins earning preview for pending orders */}
+            {!result.coinsCredited && potentialCoins > 0 && result.status === "pending" && (
+              <div style={{
+                display: "flex", alignItems: "center", gap: "8px",
+                padding: "10px 14px", borderRadius: "8px", marginBottom: "16px",
+                background: "rgba(251,191,36,0.04)",
+                border: "1px dashed rgba(251,191,36,0.2)",
+                color: "#fbbf24", fontSize: "0.8rem",
+              }}>
+                <Icon icon="lucide:coins" width={15} />
+                <span>Confirming this order will credit <strong>{potentialCoins} coin{potentialCoins !== 1 ? "s" : ""}</strong> (₦{(potentialCoins * 100).toLocaleString()}) to the customer</span>
+              </div>
+            )}
 
             {/* Progress Stepper */}
             <div style={{ marginBottom: "4px" }}>
@@ -388,7 +469,7 @@ export default function AdminTrackOrder() {
                   <label style={{ display: "block", color: "#94a3b8", fontSize: "0.8rem", marginBottom: "6px", fontWeight: 600 }}>Status</label>
                   <select value={editForm.status} onChange={(e) => setEditForm({ ...editForm, status: e.target.value })} style={selectStyle} disabled={saving}>
                     <option value="">Select status</option>
-                    {ALL_STATUSES.map(s => (
+                    {ALL_STATUSES.map((s) => (
                       <option key={s} value={s} style={{ background: "#0f172a" }}>{s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g, " ")}</option>
                     ))}
                   </select>
@@ -479,6 +560,29 @@ export default function AdminTrackOrder() {
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: "1rem", fontWeight: 800, color: "#e2e8f0", paddingTop: "8px", borderTop: "1px solid #1e293b", marginTop: "4px" }}>
                 <span>Total</span><span style={{ color: "#34d399" }}>{formatCurrency(result.totalAmount)}</span>
               </div>
+
+              {/* ✅ NEW: Coins summary in totals section */}
+              {potentialCoins > 0 && (
+                <div style={{
+                  display: "flex", justifyContent: "space-between", alignItems: "center",
+                  fontSize: "0.82rem", paddingTop: "8px", marginTop: "4px",
+                  borderTop: "1px dashed rgba(251,191,36,0.2)",
+                }}>
+                  <span style={{ color: "#fbbf24", display: "flex", alignItems: "center", gap: "5px" }}>
+                    <Icon icon="lucide:coins" width={13} /> Loyalty Coins
+                  </span>
+                  <span style={{
+                    color: result.coinsCredited ? "#34d399" : "#fbbf24",
+                    fontWeight: 700, display: "flex", alignItems: "center", gap: "5px",
+                  }}>
+                    {result.coinsCredited ? (
+                      <><Icon icon="lucide:check-circle" width={13} /> {potentialCoins} coins credited</>
+                    ) : (
+                      <>{potentialCoins} coins pending confirmation</>
+                    )}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 

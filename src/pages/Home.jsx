@@ -3,6 +3,7 @@ import { Link, useSearchParams, useLocation } from "react-router-dom";
 import { Icon } from "@iconify/react";
 import api from "../api/axios";
 import { useCart } from "../context/CartContext";
+import { useAuth } from "../context/AuthContext"; // ✅ NEW
 import "./Home.css";
 
 const DEFAULT_SLIDES = [
@@ -75,7 +76,7 @@ const SUBCATEGORY_ICON_MAP = {
   "Motorcycle Parts": "lucide:bike", "Tools & Equipment": "lucide:hammer", "Automotive Accessories": "lucide:settings",
 };
 
-// ═══════ MOVED OUTSIDE: Pure helper functions ═══════
+// ═══════ Pure helper functions ═══════
 const parseBool = (val) => {
   if (val === true || val === 1 || val === "true" || val === "1") return true;
   return false;
@@ -89,6 +90,36 @@ const discountPct = (p) => {
 const pad = (n) => String(n).padStart(2, "0");
 
 const getSubIcon = (subName) => SUBCATEGORY_ICON_MAP[subName] || "lucide:tag";
+
+// ✅ NEW: Calculate margin from engineering price
+const calcMargin = (p) => {
+  const engPrice = p.engineeringPrice ? Number(p.engineeringPrice) : 0;
+  const sellPrice = p.discountPrice ? Number(p.discountPrice) : Number(p.price) || 0;
+  if (engPrice <= 0 || sellPrice <= 0) return null;
+  const marginAmt = sellPrice - engPrice;
+  const marginPct = ((marginAmt / sellPrice) * 100).toFixed(1);
+  return { amount: marginAmt, pct: marginPct };
+};
+
+// ✅ NEW: Format engineering price for display
+const formatEngPrice = (p, currency = "₦") => {
+  if (!p.engineeringPrice) return null;
+  return `${currency}${Number(p.engineeringPrice).toLocaleString()}`;
+};
+
+const getProductImages = (p) => {
+  if (Array.isArray(p.images) && p.images.length > 0) {
+    const valid = p.images.filter((img) => img && img.trim());
+    if (valid.length > 0) return valid;
+  }
+  if (p.image && p.image.trim()) return [p.image];
+  return [];
+};
+
+const getPrimaryImage = (p, fallback = "") => {
+  const imgs = getProductImages(p);
+  return imgs.length > 0 ? imgs[0] : fallback;
+};
 
 const groupByCategory = (list) => {
   const map = {};
@@ -109,13 +140,15 @@ const priceRange = (items, currency) => {
   return min === max ? `${currency}${min.toLocaleString()}` : `${currency}${min.toLocaleString()} – ${currency}${max.toLocaleString()}`;
 };
 
-// ═══════ MOVED OUTSIDE: DropdownProductPreview ═══════
-const DropdownProductPreview = ({ p, currency, onClose }) => {
+// ═══════ DropdownProductPreview ═══════
+const DropdownProductPreview = ({ p, currency, onClose, canSeeEngPricing }) => { // ✅ Added canSeeEngPricing
   const pct = discountPct(p);
+  const margin = canSeeEngPricing ? calcMargin(p) : null; // ✅ NEW
+
   return (
     <Link to={`/product/${p._id}`} className="jm-mega-product" onClick={onClose}>
       <div className="jm-mega-product__img-wrap">
-        <img src={p.image || `https://picsum.photos/seed/mega${p._id}/120/120`} alt={p.name} loading="lazy" />
+        <img src={getPrimaryImage(p, `https://picsum.photos/seed/mega${p._id}/120/120`)} alt={p.name} loading="lazy" />
         {pct && <span className="jm-mega-product__badge">-{pct}%</span>}
       </div>
       <div className="jm-mega-product__info">
@@ -126,13 +159,24 @@ const DropdownProductPreview = ({ p, currency, onClose }) => {
             <span className="jm-mega-product__old">{currency}{p.price.toLocaleString()}</span>
           )}
         </div>
+        {/* ✅ NEW: Engineering margin for admin/engineer */}
+        {canSeeEngPricing && margin && (
+          <span className="jm-mega-product__margin" style={{ color: margin.amount >= 0 ? "#2b8a3e" : "#e03131" }}>
+            M: {currency}{margin.amount.toLocaleString()} ({margin.pct}%)
+          </span>
+        )}
       </div>
     </Link>
   );
 };
 
-// ═══════ MOVED OUTSIDE: ProductCard ═══════
-const ProductCard = ({ p, prefix = "", showProgress = false, showNew = false, compact = false, flash = false, currency, cartQty, isSyncing, onAddToCart }) => {
+// ═══════ ProductCard ═══════
+const ProductCard = ({ p, prefix = "", showProgress = false, showNew = false, compact = false, flash = false, currency, cartQty, isSyncing, onAddToCart, canSeeEngPricing }) => { // ✅ Added canSeeEngPricing
+  const [imgIndex, setImgIndex] = useState(0);
+  const allImages = getProductImages(p);
+  const hasMultiple = allImages.length > 1;
+  const currentImg = allImages[imgIndex] || `https://picsum.photos/seed/${prefix}${p._id}/300/300`;
+
   const pct = discountPct(p);
   const itemsLeft = p.countInStock ?? 0;
   const totalStock = p.totalStock ?? p.initialStock ?? null;
@@ -145,12 +189,28 @@ const ProductCard = ({ p, prefix = "", showProgress = false, showNew = false, co
   const isOutOfStock = p.countInStock === 0;
   const isMaxStock = p.countInStock > 0 && cartQty >= p.countInStock;
 
+  // ✅ NEW: Compute engineering price display
+  const engPriceFormatted = canSeeEngPricing ? formatEngPrice(p, currency) : null;
+  const margin = canSeeEngPricing ? calcMargin(p) : null;
+
+  const handlePrevImg = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setImgIndex((prev) => (prev - 1 + allImages.length) % allImages.length);
+  };
+
+  const handleNextImg = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setImgIndex((prev) => (prev + 1) % allImages.length);
+  };
+
   return (
     <Link
       to={`/product/${p._id}`}
       className={`jm-product-card ${compact ? "jm-product-card--compact" : ""} ${flash ? "jm-product-card--flash" : ""}`}
       onClick={(e) => {
-        if (e.target.closest('.jm-product-card__cart-action')) {
+        if (e.target.closest('.jm-product-card__cart-action') || e.target.closest('.jm-product-card__img-nav')) {
           e.preventDefault();
         }
       }}
@@ -159,7 +219,25 @@ const ProductCard = ({ p, prefix = "", showProgress = false, showNew = false, co
         {pct && <span className="jm-discount-badge" style={flash ? { color: "#fff", background: "rgba(255,255,255,0.2)", border: "1px solid rgba(255,255,255,0.4)" } : undefined}>-{pct}%</span>}
         {showNew && <span className="jm-new-badge">NEW</span>}
         {isOutOfStock && <span className="jm-oos-badge">OUT OF STOCK</span>}
-        <img src={p.image || `https://picsum.photos/seed/${prefix}${p._id}/300/300`} alt={p.name} className="jm-product-card__img" loading="lazy" />
+        <img src={currentImg} alt={p.name} className="jm-product-card__img" loading="lazy" />
+
+        {hasMultiple && (
+          <>
+            <button type="button" className="jm-product-card__img-nav jm-product-card__img-nav--prev" onClick={handlePrevImg} aria-label="Previous image">
+              <Icon icon="lucide:chevron-left" width={14} />
+            </button>
+            <button type="button" className="jm-product-card__img-nav jm-product-card__img-nav--next" onClick={handleNextImg} aria-label="Next image">
+              <Icon icon="lucide:chevron-right" width={14} />
+            </button>
+            <span className="jm-product-card__img-counter">{imgIndex + 1}/{allImages.length}</span>
+            <div className="jm-product-card__img-dots">
+              {allImages.map((_, dotIdx) => (
+                <span key={dotIdx} className={`jm-product-card__img-dot ${dotIdx === imgIndex ? "jm-product-card__img-dot--active" : ""}`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); setImgIndex(dotIdx); }} />
+              ))}
+            </div>
+          </>
+        )}
+
         <div className="jm-product-card__img-overlay" />
       </div>
       <div className="jm-product-card__info">
@@ -171,6 +249,21 @@ const ProductCard = ({ p, prefix = "", showProgress = false, showNew = false, co
         {p.discountPrice && p.price && (
           <span className="jm-product-card__save" style={flash ? { color: "rgba(255,255,255,0.7)" } : undefined}>You save {currency}{(p.price - p.discountPrice).toLocaleString()}</span>
         )}
+
+        {/* ✅ NEW: Engineering price + margin (admin/engineer only) */}
+        {canSeeEngPricing && engPriceFormatted && (
+          <div className="jm-product-card__eng-info" style={flash ? { background: "rgba(255,255,255,0.08)", borderColor: "rgba(255,255,255,0.12)" } : undefined}>
+            <span className="jm-product-card__eng-price" style={flash ? { color: "rgba(255,255,255,0.65)" } : undefined}>
+              Eng: {engPriceFormatted}
+            </span>
+            {margin && (
+              <span className="jm-product-card__margin" style={{ color: flash ? (margin.amount >= 0 ? "#69db7c" : "#ff8787") : (margin.amount >= 0 ? "#2b8a3e" : "#e03131") }}>
+                Margin: {currency}{margin.amount.toLocaleString()} ({margin.pct}%)
+              </span>
+            )}
+          </div>
+        )}
+
         {showProgress && (
           <div className="jm-flash-progress">
             <div className="jm-flash-progress__bar">
@@ -204,7 +297,7 @@ const ProductCard = ({ p, prefix = "", showProgress = false, showNew = false, co
   );
 };
 
-// ═══════ MOVED OUTSIDE: SkeletonCard ═══════
+// ═══════ SkeletonCard ═══════
 const SkeletonCard = () => (
   <div className="jm-skeleton-card">
     <div className="jm-skeleton jm-skeleton--img" />
@@ -232,9 +325,13 @@ function ScrollToTop() {
 
 // ═══════ MAIN HOME COMPONENT ═══════
 export default function Home() {
+  const { user } = useAuth(); // ✅ NEW: Get the logged-in user
+  const canSeeEngPricing = user?.role === "admin" || user?.role === "engineer"; // ✅ NEW
+
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [siteSettings, setSiteSettings] = useState(null);
+  const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [timeLeft, setTimeLeft] = useState({ h: 8, m: 45, s: 12 });
@@ -244,7 +341,7 @@ export default function Home() {
   const [mobileCatDrawer, setMobileCatDrawer] = useState(false);
   const [hoveredSidebarCat, setHoveredSidebarCat] = useState(null);
   const [mobileExpandedCat, setMobileExpandedCat] = useState(null);
-  const [productCategories, setProductCategories] = useState({}); // Updated to state
+  const [productCategories, setProductCategories] = useState({});
   const catScrollRef = useRef(null);
   const dropdownRef = useRef(null);
   const mobileDrawerRef = useRef(null);
@@ -277,7 +374,20 @@ export default function Home() {
   const googlePlayLink = siteSettings?.googlePlayLink || "#";
   const aboutUs = siteSettings?.aboutUs || "";
 
-  const heroSlides = siteSettings?.heroSlides?.length > 0 ? siteSettings.heroSlides : DEFAULT_SLIDES;
+  const heroSlides = messages.length > 0
+    ? messages.map(m => ({
+        bg: m.bg,
+        tag: m.tag,
+        title: m.title,
+        sub: m.sub,
+        price: m.price,
+        img: m.img,
+        link: m.link || "/products",
+      }))
+    : siteSettings?.heroSlides?.length > 0
+      ? siteSettings.heroSlides
+      : DEFAULT_SLIDES;
+
   const sidePromos = siteSettings?.sidePromos?.length > 0 ? siteSettings.sidePromos : DEFAULT_SIDE_PROMOS;
   const services = siteSettings?.services?.length > 0 ? siteSettings.services : DEFAULT_SERVICES;
   const popularSearches = siteSettings?.popularSearches?.length > 0 ? siteSettings.popularSearches : DEFAULT_SEARCHES;
@@ -317,16 +427,17 @@ export default function Home() {
   useEffect(() => {
     const fetchAll = async () => {
       try {
-        const [catRes, setRes, groupedRes] = await Promise.all([
-          api.get("/categories"),
+        const [catRes, setRes, groupedRes, msgRes] = await Promise.all([
+          api.get("/categories?isActive=true&limit=1000"),
           api.get("/site-settings"),
-          api.get("/products/grouped"), // Using the new grouped endpoint
+          api.get("/products/grouped"),  // ✅ optionalAuth on backend will include engineeringPrice for admin/engineer
+          api.get("/messages?active=true"),
         ]);
-        
+
         const groupedData = groupedRes.data;
         const mappedCategories = {};
         const allProducts = [];
-        
+
         if (Array.isArray(groupedData)) {
           groupedData.forEach(group => {
             const catName = group._id || "Uncategorized";
@@ -334,12 +445,15 @@ export default function Home() {
             allProducts.push(...group.products);
           });
         }
-        
+
+        const messagesData = msgRes.data.data || msgRes.data;
+
         setProducts(allProducts);
         setCategories(catRes.data.categories || catRes.data);
         setSiteSettings(setRes.data);
+        setMessages(messagesData);
         setProductCategories(mappedCategories);
-        
+
         const keys = Object.keys(mappedCategories);
         if (keys.length) setActiveCat(keys[0]);
       } catch (error) {
@@ -388,7 +502,7 @@ export default function Home() {
       await addToCart({
         _id: product._id,
         name: product.name,
-        image: product.image || `https://picsum.photos/seed/${product._id}/300/300`,
+        image: getPrimaryImage(product, `https://picsum.photos/seed/${product._id}/300/300`),
         price: product.discountPrice || product.price,
       }, 1);
     } catch (err) {
@@ -453,6 +567,7 @@ export default function Home() {
                   cartQty={getCartQty(p._id)}
                   isSyncing={isSyncing}
                   onAddToCart={handleAddToCart}
+                  canSeeEngPricing={canSeeEngPricing} // ✅ NEW
                 />
               ))}
             </div>
@@ -543,7 +658,13 @@ export default function Home() {
                               </div>
                               <div className="jm-sidebar-dropdown__products-list">
                                 {topProducts.map((p) => (
-                                  <DropdownProductPreview key={p._id} p={p} currency={currency} onClose={() => setHoveredSidebarCat(null)} />
+                                  <DropdownProductPreview
+                                    key={p._id}
+                                    p={p}
+                                    currency={currency}
+                                    onClose={() => setHoveredSidebarCat(null)}
+                                    canSeeEngPricing={canSeeEngPricing} // ✅ NEW
+                                  />
                                 ))}
                               </div>
                             </div>
@@ -665,15 +786,24 @@ export default function Home() {
                       <div className="jm-mobile-cat-drawer__products">
                         <div className="jm-mobile-cat-drawer__products-label">Popular in {cat.name}</div>
                         <div className="jm-mobile-cat-drawer__products-list">
-                          {previewProducts.map((p) => (
-                            <Link to={`/product/${p._id}`} key={p._id} className="jm-mobile-cat-drawer__product" onClick={() => setMobileCatDrawer(false)}>
-                              <img src={p.image || `https://picsum.photos/seed/mob${p._id}/100/100`} alt={p.name} />
-                              <div className="jm-mobile-cat-drawer__product-info">
-                                <span className="jm-mobile-cat-drawer__product-name">{p.name}</span>
-                                <span className="jm-mobile-cat-drawer__product-price">{currency}{(p.discountPrice || p.price)?.toLocaleString()}</span>
-                              </div>
-                            </Link>
-                          ))}
+                          {previewProducts.map((p) => {
+                            const pMargin = canSeeEngPricing ? calcMargin(p) : null; // ✅ NEW
+                            return (
+                              <Link to={`/product/${p._id}`} key={p._id} className="jm-mobile-cat-drawer__product" onClick={() => setMobileCatDrawer(false)}>
+                                <img src={getPrimaryImage(p, `https://picsum.photos/seed/mob${p._id}/100/100`)} alt={p.name} />
+                                <div className="jm-mobile-cat-drawer__product-info">
+                                  <span className="jm-mobile-cat-drawer__product-name">{p.name}</span>
+                                  <span className="jm-mobile-cat-drawer__product-price">{currency}{(p.discountPrice || p.price)?.toLocaleString()}</span>
+                                  {/* ✅ NEW: Margin for admin/engineer in mobile drawer */}
+                                  {canSeeEngPricing && pMargin && (
+                                    <span className="jm-mobile-cat-drawer__product-margin" style={{ fontSize: "0.65rem", fontWeight: 600, color: pMargin.amount >= 0 ? "#2b8a3e" : "#e03131" }}>
+                                      M: {currency}{pMargin.amount.toLocaleString()} ({pMargin.pct}%)
+                                    </span>
+                                  )}
+                                </div>
+                              </Link>
+                            );
+                          })}
                         </div>
                         <Link to={`/products?category=${cat.name}`} className="jm-mobile-cat-drawer__products-seeall" onClick={() => setMobileCatDrawer(false)}>
                           See all {catProducts.length} products <Icon icon="lucide:arrow-right" width={14} />
@@ -770,7 +900,7 @@ export default function Home() {
           </div>
           <div className="jm-product-grid jm-product-grid--5">
             {flashSaleProducts.slice(0, 10).map((p) => (
-              <ProductCard key={p._id} p={p} prefix="flash-" showProgress flash currency={currency} cartQty={getCartQty(p._id)} isSyncing={isSyncing} onAddToCart={handleAddToCart} />
+              <ProductCard key={p._id} p={p} prefix="flash-" showProgress flash currency={currency} cartQty={getCartQty(p._id)} isSyncing={isSyncing} onAddToCart={handleAddToCart} canSeeEngPricing={canSeeEngPricing} />
             ))}
           </div>
         </section>
@@ -828,7 +958,7 @@ export default function Home() {
           </div>
           <div className="jm-product-grid jm-product-grid--6">
             {featuredProducts.slice(0, 6).map((p) => (
-              <ProductCard key={`deal-${p._id}`} p={p} prefix="deal-" compact currency={currency} cartQty={getCartQty(p._id)} isSyncing={isSyncing} onAddToCart={handleAddToCart} />
+              <ProductCard key={`deal-${p._id}`} p={p} prefix="deal-" compact currency={currency} cartQty={getCartQty(p._id)} isSyncing={isSyncing} onAddToCart={handleAddToCart} canSeeEngPricing={canSeeEngPricing} />
             ))}
           </div>
         </section>
@@ -902,7 +1032,7 @@ export default function Home() {
               </div>
               <div className="jm-product-grid jm-product-grid--4">
                 {productCategories[activeCat].map((p) => (
-                  <ProductCard key={`cat-${p._id}`} p={p} prefix={`cat-${activeCat}-`} currency={currency} cartQty={getCartQty(p._id)} isSyncing={isSyncing} onAddToCart={handleAddToCart} />
+                  <ProductCard key={`cat-${p._id}`} p={p} prefix={`cat-${activeCat}-`} currency={currency} cartQty={getCartQty(p._id)} isSyncing={isSyncing} onAddToCart={handleAddToCart} canSeeEngPricing={canSeeEngPricing} />
                 ))}
               </div>
             </div>
@@ -922,7 +1052,7 @@ export default function Home() {
           </div>
           <div className="jm-product-grid jm-product-grid--5">
             {newArrivalProducts.slice(0, 10).map((p) => (
-              <ProductCard key={`new-${p._id}`} p={p} prefix="new-" showNew currency={currency} cartQty={getCartQty(p._id)} isSyncing={isSyncing} onAddToCart={handleAddToCart} />
+              <ProductCard key={`new-${p._id}`} p={p} prefix="new-" showNew currency={currency} cartQty={getCartQty(p._id)} isSyncing={isSyncing} onAddToCart={handleAddToCart} canSeeEngPricing={canSeeEngPricing} />
             ))}
           </div>
         </section>
@@ -942,11 +1072,12 @@ export default function Home() {
             {products.filter((p) => p.discountPrice && p.price).sort((a, b) => ((b.price - b.discountPrice) / b.price) - ((a.price - a.discountPrice) / a.price)).slice(0, 6).map((p) => {
               const pct = discountPct(p);
               const saved = p.price - p.discountPrice;
+              const dropMargin = canSeeEngPricing ? calcMargin(p) : null; // ✅ NEW
               return (
                 <Link to={`/product/${p._id}`} key={`drop-${p._id}`} className="jm-price-drop-card">
                   <div className="jm-price-drop-card__img-wrap">
                     <span className="jm-price-drop-card__badge">-{pct}%</span>
-                    <img src={p.image || `https://picsum.photos/seed/drop${p._id}/150/150`} alt={p.name} loading="lazy" />
+                    <img src={getPrimaryImage(p, `https://picsum.photos/seed/drop${p._id}/150/150`)} alt={p.name} loading="lazy" />
                   </div>
                   <div className="jm-price-drop-card__info">
                     <h4 className="jm-price-drop-card__name">{p.name}</h4>
@@ -955,6 +1086,12 @@ export default function Home() {
                       <span className="jm-price-drop-card__old">{currency}{p.price.toLocaleString()}</span>
                     </div>
                     <span className="jm-price-drop-card__save">Save {currency}{saved.toLocaleString()}</span>
+                    {/* ✅ NEW: Engineering margin for admin/engineer */}
+                    {canSeeEngPricing && dropMargin && (
+                      <span className="jm-price-drop-card__margin" style={{ color: dropMargin.amount >= 0 ? "#2b8a3e" : "#e03131" }}>
+                        Margin: {currency}{dropMargin.amount.toLocaleString()} ({dropMargin.pct}%)
+                      </span>
+                    )}
                     <div className="jm-price-drop-card__bar-wrap">
                       <div className="jm-price-drop-card__bar">
                         <div className="jm-price-drop-card__bar-fill" style={{ width: `${100 - pct}%` }} />
@@ -984,13 +1121,12 @@ export default function Home() {
           </div>
           <div className="jm-product-grid jm-product-grid--4">
             {items.map((p) => (
-              <ProductCard key={`list-${catName}-${p._id}`} p={p} prefix={`list-${catName}-`} currency={currency} cartQty={getCartQty(p._id)} isSyncing={isSyncing} onAddToCart={handleAddToCart} />
+              <ProductCard key={`list-${catName}-${p._id}`} p={p} prefix={`list-${catName}-`} currency={currency} cartQty={getCartQty(p._id)} isSyncing={isSyncing} onAddToCart={handleAddToCart} canSeeEngPricing={canSeeEngPricing} />
             ))}
           </div>
         </section>
       ))}
-
-      {/* ═══════ WHY SHOP WITH US ═══════ */}
+            {/* ═══════ WHY SHOP WITH US ═══════ */}
       <section className="jm-section jm-trust-section">
         <div className="jm-section__header"><h2 className="jm-section__title">WHY SHOP WITH US</h2></div>
         <div className="jm-trust-grid">
@@ -1083,7 +1219,171 @@ export default function Home() {
         <div className="jm-footer__bottom"><p>{footerText}</p></div>
       </footer>
 
-      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+      <style>{`
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+        /* ═══════ Product Card Image Gallery ═══════ */
+        .jm-product-card__img-wrap {
+          position: relative;
+          overflow: hidden;
+        }
+
+        .jm-product-card__img-nav {
+          position: absolute;
+          top: 50%;
+          transform: translateY(-50%);
+          width: 26px;
+          height: 26px;
+          border-radius: 50%;
+          background: rgba(255, 255, 255, 0.92);
+          border: 1px solid rgba(0, 0, 0, 0.08);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          z-index: 3;
+          opacity: 0;
+          transition: opacity 0.2s ease, background 0.15s ease, box-shadow 0.15s ease;
+          box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+          color: #495057;
+        }
+
+        .jm-product-card__img-wrap:hover .jm-product-card__img-nav {
+          opacity: 1;
+        }
+
+        @media (hover: none) and (pointer: coarse) {
+          .jm-product-card__img-nav {
+            opacity: 0.85;
+          }
+        }
+
+        .jm-product-card__img-nav:hover {
+          background: #fff;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        .jm-product-card__img-nav:active {
+          transform: translateY(-50%) scale(0.92);
+        }
+
+        .jm-product-card__img-nav--prev { left: 6px; }
+        .jm-product-card__img-nav--next { right: 6px; }
+
+        .jm-product-card__img-counter {
+          position: absolute;
+          top: 8px;
+          right: 8px;
+          background: rgba(0, 0, 0, 0.55);
+          color: #fff;
+          font-size: 0.65rem;
+          font-weight: 600;
+          padding: 2px 7px;
+          border-radius: 10px;
+          z-index: 3;
+          letter-spacing: 0.3px;
+          backdrop-filter: blur(4px);
+          -webkit-backdrop-filter: blur(4px);
+        }
+
+        .jm-product-card__img-dots {
+          position: absolute;
+          bottom: 10px;
+          left: 50%;
+          transform: translateX(-50%);
+          display: flex;
+          gap: 4px;
+          z-index: 3;
+        }
+
+        .jm-product-card__img-dot {
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          background: rgba(255, 255, 255, 0.5);
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+
+        .jm-product-card__img-dot--active {
+          background: #fff;
+          box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.2);
+          transform: scale(1.2);
+        }
+
+        .jm-product-card__img-dot:hover {
+          background: rgba(255, 255, 255, 0.85);
+        }
+
+        .jm-product-card--flash .jm-product-card__img-counter {
+          background: rgba(255, 255, 255, 0.2);
+          border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .jm-product-card--flash .jm-product-card__img-nav {
+          background: rgba(255, 255, 255, 0.15);
+          border: 1px solid rgba(255, 255, 255, 0.3);
+          color: #fff;
+        }
+
+        .jm-product-card--flash .jm-product-card__img-nav:hover {
+          background: rgba(255, 255, 255, 0.3);
+        }
+
+        .jm-product-card--compact .jm-product-card__img-nav { width: 22px; height: 22px; }
+        .jm-product-card--compact .jm-product-card__img-nav--prev { left: 4px; }
+        .jm-product-card--compact .jm-product-card__img-nav--next { right: 4px; }
+        .jm-product-card--compact .jm-product-card__img-counter { font-size: 0.6rem; padding: 1px 6px; top: 6px; right: 6px; }
+        .jm-product-card--compact .jm-product-card__img-dot { width: 5px; height: 5px; }
+        .jm-product-card--compact .jm-product-card__img-dots { bottom: 8px; gap: 3px; }
+
+        /* ═══════ ✅ NEW: Engineering Price & Margin in Product Card ═══════ */
+        .jm-product-card__eng-info {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+          margin-top: 4px;
+          padding: 4px 8px;
+          background: #f8f9fa;
+          border: 1px solid #e9ecef;
+          border-radius: 6px;
+          font-size: 0.72rem;
+          line-height: 1.4;
+        }
+
+        .jm-product-card__eng-price {
+          font-weight: 500;
+          color: #495057;
+          font-size: 0.7rem;
+        }
+
+        .jm-product-card__margin {
+          font-weight: 600;
+          font-size: 0.72rem;
+        }
+
+        /* ═══════ ✅ NEW: Margin in Mega Dropdown ═══════ */
+        .jm-mega-product__margin {
+          display: block;
+          font-size: 0.65rem;
+          font-weight: 600;
+          margin-top: 1px;
+        }
+
+        /* ═══════ ✅ NEW: Margin in Price Drop Card ═══════ */
+        .jm-price-drop-card__margin {
+          display: block;
+          font-size: 0.72rem;
+          font-weight: 600;
+          margin-top: 2px;
+        }
+
+        /* ═══════ ✅ NEW: Margin in Mobile Drawer Product ═══════ */
+        .jm-mobile-cat-drawer__product-margin {
+          display: block;
+          margin-top: 1px;
+        }
+      `}</style>
 
       {/* ═══════ END NORMAL HOME PAGE CONTENT ═══════ */}
       </>

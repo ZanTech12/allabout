@@ -1,0 +1,61 @@
+.point-card {
+  background: linear-gradient(135deg, #f68b1e 0%, #e8590c 100%);
+  border-radius: 12px;
+  padding: 20px;
+  color: #fff;
+  box-shadow: 0 4px 15px rgba(246, 139, 30, 0.3);
+}
+.point-card__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.point-card__icon-wrap {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.point-card__label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  opacity: 0.9;
+}
+.point-card__body {
+  margin-bottom: 16px;
+}
+.point-card__balance {
+  font-size: 2rem;
+  margin: 0;
+  font-weight: 700;
+  line-height: 1;
+}
+.point-card__balance span {
+  font-size: 0.9rem;
+  font-weight: 500;
+  opacity: 0.8;
+}
+.point-card__value {
+  margin: 6px 0 0;
+  font-size: 0.9rem;
+  opacity: 0.85;
+}
+.point-card__footer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  opacity: 0.7;
+  border-top: 1px solid rgba(255,255,255,0.2);
+  padding-top: 12px;
+}
+.point-card__skeleton {
+  height: 48px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  margin-bottom: 16px;
+}
