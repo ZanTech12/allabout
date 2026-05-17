@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Icon } from "@iconify/react";
 import api from "../../api/axios";
@@ -38,6 +38,7 @@ const EMPTY_FORM = {
 export default function ProductsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const isMobile = useIsMobile();
+  const fileInputRef = useRef(null); // Ref for hidden file input
 
   /* ── Read filter params from URL ── */
   const filterCategory = searchParams.get("category") || "";
@@ -111,6 +112,7 @@ export default function ProductsPage() {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false); // Upload state
   const [message, setMessage] = useState({ type: "", text: "" });
   const [searchTerm, setSearchTerm] = useState("");
   const [showForm, setShowForm] = useState(false);
@@ -175,6 +177,57 @@ export default function ProductsPage() {
       updated[index] = value;
       return { ...prev, images: updated };
     });
+  };
+
+  /* ── Backend Image Upload Handler ── */
+  const handleImageUpload = async (e) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setUploadingImage(true);
+    const formData = new FormData();
+
+    // Append all selected files to FormData
+    // The key "images" matches upload.array("images") in the backend
+    for (let i = 0; i < files.length; i++) {
+      formData.append("images", files[i]); 
+    }
+
+    try {
+      // Send files to your backend API endpoint
+      const response = await api.post("/upload", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      // Backend returns { urls: ["url1", "url2"] }
+      const uploadedUrls = response.data.urls;
+
+      if (Array.isArray(uploadedUrls) && uploadedUrls.length > 0) {
+        setForm((prev) => {
+          // ✅ IMPROVEMENT: Filter out empty placeholder strings before adding uploaded URLs
+          const existingValidImages = prev.images.filter((img) => img && img.trim());
+          return {
+            ...prev,
+            images: [...existingValidImages, ...uploadedUrls],
+          };
+        });
+        showMessage("success", `${uploadedUrls.length} image(s) uploaded successfully`);
+      } else {
+        throw new Error("No URLs returned from server");
+      }
+    } catch (error) {
+      console.error(error);
+      showMessage(
+        "error",
+        error.response?.data?.message || "Image upload failed. Please try again."
+      );
+    } finally {
+      setUploadingImage(false);
+      // Reset file input so same file can be re-uploaded if needed
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
   };
 
   /* ── Helper: get the primary image for display ── */
@@ -317,7 +370,6 @@ export default function ProductsPage() {
     count === 0 ? "Out of stock" : `${count} in stock`;
   const getFlagCount = (flag) => products.filter((p) => parseBool(p[flag])).length;
 
-  /* ── Helper: format engineering price for display ── */
   const formatEngPrice = (p) => {
     if (p.engineeringPrice && p.engineeringPrice > 0) {
       return `₦${Number(p.engineeringPrice).toLocaleString()}`;
@@ -617,11 +669,11 @@ export default function ProductsPage() {
               />
             </div>
 
-            {/* ── Multiple Image URLs ── */}
+            {/* ── Multiple Image URLs + Upload ── */}
             <div className="col-12">
               <div className="d-flex align-items-center justify-content-between mb-2">
                 <label className="prod-form__label mb-0">
-                  Image URLs *{" "}
+                  Images *{" "}
                   <span className="text-muted fw-normal" style={{ fontSize: "0.8rem" }}>
                     ({form.images.filter((img) => img && img.trim()).length}{" "}
                     {form.images.filter((img) => img && img.trim()).length === 1
@@ -629,13 +681,40 @@ export default function ProductsPage() {
                       : "images"})
                   </span>
                 </label>
-                <button
-                  type="button"
-                  onClick={addImageField}
-                  className="prod-form__add-img-btn"
-                >
-                  <Icon icon="lucide:plus" width={14} /> Add Image
-                </button>
+                <div className="d-flex gap-2">
+                  {/* Upload Button */}
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    ref={fileInputRef}
+                    onChange={handleImageUpload}
+                    style={{ display: "none" }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="prod-form__add-img-btn"
+                    disabled={uploadingImage}
+                  >
+                    {uploadingImage ? (
+                      <Icon icon="lucide:loader-2" width={14} className="prod-form__spin" />
+                    ) : (
+                      <Icon icon="lucide:upload" width={14} />
+                    )}
+                    {uploadingImage ? "Uploading..." : "Upload"}
+                  </button>
+                  
+                  {/* Add URL Button */}
+                  <button
+                    type="button"
+                    onClick={addImageField}
+                    className="prod-form__add-img-btn"
+                    disabled={uploadingImage}
+                  >
+                    <Icon icon="lucide:plus" width={14} /> Add URL
+                  </button>
+                </div>
               </div>
 
               <div className="prod-form__images-list">
@@ -645,7 +724,7 @@ export default function ProductsPage() {
                       {index + 1}
                     </span>
                     <input
-                      required={index === 0}
+                      required={index === 0 && form.images.filter(i => i && i.trim()).length === 0}
                       value={img}
                       onChange={(e) =>
                         updateImageField(index, e.target.value)
@@ -656,6 +735,7 @@ export default function ProductsPage() {
                           ? "Primary image — https://example.com/image.jpg"
                           : "https://example.com/image.jpg"
                       }
+                      disabled={uploadingImage}
                     />
                     {form.images.length > 1 && (
                       <button
@@ -663,6 +743,7 @@ export default function ProductsPage() {
                         onClick={() => removeImageField(index)}
                         className="prod-form__image-remove"
                         title="Remove this image"
+                        disabled={uploadingImage}
                       >
                         <Icon icon="lucide:trash-2" width={15} />
                       </button>
@@ -801,7 +882,7 @@ export default function ProductsPage() {
             </button>
             <button
               type="submit"
-              disabled={saving}
+              disabled={saving || uploadingImage}
               className={`prod-form__submit ${
                 saving ? "prod-form__submit--saving" : ""
               } ${isMobile ? "w-100 justify-content-center" : ""}`}
@@ -858,7 +939,6 @@ export default function ProductsPage() {
                   </span>
                 )}
               </div>
-              {/* ✅ Engineering Price on Mobile */}
               {formatEngPrice(p) && (
                 <div className="d-flex align-items-center gap-1 mb-2">
                   <Icon icon="lucide:wrench" width={12} style={{ color: "#868e96" }} />
@@ -993,7 +1073,6 @@ export default function ProductsPage() {
                       </span>
                     )}
                   </td>
-                  {/* ✅ Engineering Price Column */}
                   <td className="prod-table__cell">
                     {formatEngPrice(p) ? (
                       <span style={{ fontSize: "0.84rem", color: "#495057", fontWeight: 500 }}>
@@ -1003,7 +1082,6 @@ export default function ProductsPage() {
                       <span style={{ fontSize: "0.8rem", color: "#ced4da" }}>—</span>
                     )}
                   </td>
-                  {/* ✅ Margin Column */}
                   <td className="prod-table__cell">
                     {marginAmt !== null ? (
                       <span style={{
