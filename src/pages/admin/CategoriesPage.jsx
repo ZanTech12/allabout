@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Icon } from "@iconify/react";
 import api from "../../api/axios";
 import Modal from "./Modal";
@@ -31,12 +31,14 @@ export default function CategoriesPage() {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [message, setMessage] = useState({ type: "", text: "" });
   const [showForm, setShowForm] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState({ id: null, name: "" });
   const isMobile = useIsMobile();
-  
+  const fileInputRef = useRef(null);
+
   const [pagination, setPagination] = useState({ page: 1, limit: 50, total: 0, pages: 0 });
   const [filters, setFilters] = useState({ isActive: true });
 
@@ -53,7 +55,7 @@ export default function CategoriesPage() {
       if (filters.isActive) params.append("isActive", "true");
 
       const res = await api.get(`/categories?${params.toString()}`);
-      
+
       if (res.data.pagination) {
         setCategories(res.data.categories);
         setPagination(prev => ({ ...prev, page: res.data.pagination.page, total: res.data.pagination.total, pages: res.data.pagination.pages }));
@@ -79,6 +81,56 @@ export default function CategoriesPage() {
   const handleEdit = (cat) => {
     setForm({ name: cat.name, icon: cat.icon || "lucide:package", image: cat.image || "", description: cat.description || "", showInSidebar: cat.showInSidebar !== false, showInCatalog: cat.showInCatalog !== false, showInHome: cat.showInHome !== false, sortOrder: cat.sortOrder || 0, isActive: cat.isActive !== false });
     setEditingCategory(cat); setShowForm(true);
+  };
+
+  /* ── Image Upload Handler ── */
+  const handleImageUpload = async (e) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setUploadingImage(true);
+    const formData = new FormData();
+
+    for (let i = 0; i < files.length; i++) {
+      formData.append("images", files[i]);
+    }
+
+    try {
+      const response = await api.post("/upload", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      const uploadedUrls = response.data.urls;
+
+      if (Array.isArray(uploadedUrls) && uploadedUrls.length > 0) {
+        setForm((prev) => ({
+          ...prev,
+          image: prev.image && prev.image.trim()
+            ? prev.image
+            : uploadedUrls[0],
+        }));
+
+        if (uploadedUrls.length > 1) {
+          showMessage("success", `First image selected. ${uploadedUrls.length} images were uploaded — only one image is used per category.`);
+        } else {
+          showMessage("success", "Image uploaded successfully");
+        }
+      } else {
+        throw new Error("No URLs returned from server");
+      }
+    } catch (error) {
+      console.error(error);
+      showMessage("error", error.response?.data?.message || "Image upload failed. Please try again.");
+    } finally {
+      setUploadingImage(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setForm((prev) => ({ ...prev, image: "" }));
   };
 
   const handleSubmit = async (e) => {
@@ -150,7 +202,7 @@ export default function CategoriesPage() {
       <Modal isOpen={showForm} onClose={resetForm} title={editingCategory ? "Edit Category" : "Add New Category"}>
         <form onSubmit={handleSubmit} className="d-flex flex-column gap-3">
           <div className="row g-3">
-            
+
             {/* Section 1: Basic Information */}
             <div className="col-12 mt-1">
               <div className="cat-form__section-title">Basic Information</div>
@@ -177,11 +229,87 @@ export default function CategoriesPage() {
               </div>
               <p className="cat-icon-selected mt-1">Selected: <code>{form.icon}</code></p>
             </div>
-            <div className="col-12 col-md-6">
-              <label className="cat-form__label">Image URL</label>
-              <input value={form.image} onChange={e => setForm({ ...form, image: e.target.value })} className="form-control cat-form__input" placeholder="https://..." />
+
+            {/* Image Upload + URL */}
+            <div className="col-12">
+              <div className="d-flex align-items-center justify-content-between mb-2">
+                <label className="cat-form__label mb-0">
+                  Category Image{" "}
+                  <span className="text-muted fw-normal" style={{ fontSize: "0.8rem" }}>
+                    {form.image && form.image.trim() ? "(1 image set)" : "(optional)"}
+                  </span>
+                </label>
+                <div className="d-flex gap-2">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    ref={fileInputRef}
+                    onChange={handleImageUpload}
+                    style={{ display: "none" }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="cat-form__add-img-btn"
+                    disabled={uploadingImage}
+                  >
+                    {uploadingImage ? (
+                      <Icon icon="lucide:loader-2" width={14} className="cat-form__spin" />
+                    ) : (
+                      <Icon icon="lucide:upload" width={14} />
+                    )}
+                    {uploadingImage ? "Uploading..." : "Upload"}
+                  </button>
+                </div>
+              </div>
+
+              <div className="cat-form__image-row">
+                <input
+                  value={form.image}
+                  onChange={e => setForm({ ...form, image: e.target.value })}
+                  className="form-control cat-form__input"
+                  placeholder="https://example.com/category-image.jpg"
+                  disabled={uploadingImage}
+                />
+                {form.image && form.image.trim() && (
+                  <button
+                    type="button"
+                    onClick={handleRemoveImage}
+                    className="cat-form__image-remove"
+                    title="Remove image"
+                    disabled={uploadingImage}
+                  >
+                    <Icon icon="lucide:trash-2" width={15} />
+                  </button>
+                )}
+              </div>
+
+              {/* Image Preview */}
+              {form.image && form.image.trim() && (
+                <div className="cat-form__img-preview mt-3">
+                  <div className="cat-form__img-preview-item">
+                    <img
+                      src={form.image}
+                      alt="Category preview"
+                      onError={(e) => {
+                        e.target.style.display = "none";
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleRemoveImage}
+                      className="cat-form__img-remove"
+                      title="Remove image"
+                      disabled={uploadingImage}
+                    >
+                      <Icon icon="lucide:x" width={12} />
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
-            <div className="col-12 col-md-6">
+
+            <div className="col-12">
               <label className="cat-form__label">Description</label>
               <textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} className="form-control cat-form__textarea" placeholder="Brief description..." rows="2" />
             </div>
@@ -194,7 +322,7 @@ export default function CategoriesPage() {
               <label className="cat-form__label">Sort Order</label>
               <input type="number" min="0" value={form.sortOrder} onChange={e => setForm({ ...form, sortOrder: Number(e.target.value) })} className="form-control cat-form__input" />
             </div>
-            <div className="col-12 col-sm-6"></div> {/* Spacer */}
+            <div className="col-12 col-sm-6"></div>
             <div className="col-12">
               <label className="cat-form__label mb-2">Display Settings</label>
               <div className="row g-2">
@@ -221,7 +349,7 @@ export default function CategoriesPage() {
           {/* Form Actions */}
           <div className={`d-flex ${isMobile ? 'flex-column-reverse' : 'justify-content-end'} gap-2 pt-3 mt-2 cat-form-actions`}>
             <button type="button" onClick={resetForm} className={`cat-form__cancel ${isMobile ? 'w-100' : ''}`}>Cancel</button>
-            <button type="submit" disabled={saving} className={`cat-form__submit ${saving ? "cat-form__submit--saving" : ""} ${isMobile ? 'w-100 justify-content-center' : ''}`}>
+            <button type="submit" disabled={saving || uploadingImage} className={`cat-form__submit ${saving ? "cat-form__submit--saving" : ""} ${isMobile ? 'w-100 justify-content-center' : ''}`}>
               {saving && <Icon icon="lucide:loader-2" width={16} className="cat-form__spin me-1" />}
               {editingCategory ? "Update Category" : "Create Category"}
             </button>
@@ -245,6 +373,18 @@ export default function CategoriesPage() {
         {categories.map((cat, index) => (
           <div key={cat._id} className={`col-12 ${isMobile ? 'col-12' : 'col-sm-6 col-lg-4'}`} style={{ animationDelay: `${index * 0.04}s` }}>
             <div className={`d-flex flex-column h-100 cat-card ${cat.isActive === false ? "cat-card--inactive" : ""}`}>
+              {/* Category Image Banner */}
+              {cat.image && cat.image.trim() && (
+                <div className="cat-card__image-banner">
+                  <img
+                    src={cat.image}
+                    alt={cat.name}
+                    className="cat-card__image-img"
+                    onError={(e) => { e.target.style.display = "none"; }}
+                  />
+                </div>
+              )}
+
               <div className="d-flex align-items-start gap-3 p-3 flex-grow-1">
                 <div className={`cat-card__icon flex-shrink-0 ${cat.isActive === false ? "cat-card__icon--off" : ""}`}>
                   <Icon icon={cat.icon || "lucide:package"} width={isMobile ? 20 : 24} />
@@ -298,7 +438,7 @@ export default function CategoriesPage() {
           <button onClick={() => handlePageChange(pagination.page - 1)} disabled={pagination.page === 1} className="cat-page-btn">
             <Icon icon="lucide:chevron-left" width={16} />
           </button>
-          
+
           {Array.from({ length: pagination.pages }, (_, i) => i + 1)
             .filter((page) => page === 1 || page === pagination.pages || Math.abs(page - pagination.page) <= (isMobile ? 1 : 2))
             .reduce((acc, page, i, arr) => {

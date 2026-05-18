@@ -110,14 +110,14 @@
    ============================================ */
 .jm-hero-section {
   display: grid;
-  grid-template-columns: 230px 1fr 210px;
-  gap: 0;
-  padding: 0;
+  grid-template-columns: 1fr 260px; /* Carousel takes most space, side promos 260px */
+  gap: 16px;
+  padding: 0 16px;
   max-width: 1400px;
-  margin: 0 auto;
+  margin: 0 auto 32px;
 }
 
-/* Hero Sidebar */
+/* Hero Sidebar (Hidden by default in this layout, shown in responsive if needed) */
 .jm-hero-sidebar {
   background: var(--jm-surface);
   border-radius: 0 0 0 var(--jm-radius-xl);
@@ -125,7 +125,7 @@
   padding: 6px 0;
   box-shadow: var(--jm-shadow-sm);
   overflow: hidden;
-  animation: heroSlideIn var(--jm-transition-slow) both;
+  display: none; 
 }
 
 @keyframes heroSlideIn {
@@ -192,8 +192,10 @@
 /* Hero Carousel */
 .jm-hero-carousel {
   position: relative;
+  border-radius: var(--jm-radius-xl);
   overflow: hidden;
-  min-height: 380px;
+  min-height: 400px;
+  max-height: 460px;
   box-shadow: var(--jm-shadow-lg);
   animation: heroFadeIn var(--jm-transition-slow) 100ms both;
 }
@@ -203,48 +205,60 @@
   to { opacity: 1; transform: scale(1); }
 }
 
+/* Each slide: GRID layout left-content / right-image */
 .jm-hero-slide {
   position: absolute;
   inset: 0;
+  display: grid;
+  grid-template-columns: 38% 62%; /* LEFT 38% text | RIGHT 62% image */
+  align-items: center;
   transition: opacity 900ms ease-in-out;
 }
 
 .jm-hero-slide__bg {
   position: absolute;
   inset: 0;
+  z-index: 0;
 }
 
 .jm-hero-slide__img {
-  position: absolute;
-  right: 0;
-  top: 0;
-  bottom: 0;
-  width: 50%;
-  object-fit: cover;
-  mask-image: linear-gradient(to left, rgba(0,0,0,0.6) 0%, transparent 100%);
-  -webkit-mask-image: linear-gradient(to left, rgba(0,0,0,0.6) 0%, transparent 100%);
+  position: relative;
+  z-index: 2;
+  width: 115%;           /* Bleeds past its grid cell for drama */
+  max-height: 130%;
+  object-fit: contain;
+  object-position: left center;
+  filter: drop-shadow(0 20px 40px rgba(0, 0, 0, 0.3));
+  justify-self: start;   /* Anchor to the left edge of the right column */
+  transition: transform 0.6s ease;
 }
 
 .jm-hero-slide__overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(100deg, rgba(15, 23, 42, 0.55) 0%, rgba(15, 23, 42, 0.15) 60%, transparent 100%);
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.35) 0%, rgba(0, 0, 0, 0.15) 40%, rgba(0, 0, 0, 0.02) 60%, transparent 100%);
+  z-index: 1;
 }
 
+/* Content sits in the LEFT column, neatly centered */
 .jm-hero-slide__content {
   position: relative;
   z-index: 2;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  height: 100%;
-  padding: 44px 52px;
-  max-width: 58%;
+  align-items: center;     /* Centers items horizontally */
+  justify-content: center; /* Centers items vertically */
+  text-align: center;      /* Centers the text */
+  height: 100%;            /* Ensures full height for vertical centering */
+  padding: 48px 32px;
+  max-width: 100%;         /* Remove old 58% constraint */
+  gap: 10px;
+  color: #fff;
 }
 
 .jm-hero-tag {
   display: inline-flex;
-  align-self: flex-start;
+  align-self: center; /* Centered tag */
   padding: 5px 16px;
   background: rgba(16, 185, 129, 0.25);
   backdrop-filter: blur(10px);
@@ -255,7 +269,7 @@
   font-weight: 800;
   letter-spacing: 0.12em;
   color: #a7f3d0;
-  margin-bottom: 18px;
+  margin-bottom: 8px;
   animation: tagGlow 3s ease-in-out infinite;
 }
 
@@ -280,6 +294,7 @@
   color: rgba(255, 255, 255, 0.8);
   margin-bottom: 4px;
   font-weight: 400;
+  max-width: 320px; /* Keeps subtitle neat */
 }
 
 .jm-hero-price {
@@ -287,13 +302,16 @@
   font-weight: 700;
   color: #6ee7b7;
   margin-bottom: 28px;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 6px 16px;
+  border-radius: 8px;
 }
 
 .jm-hero-cta {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  align-self: flex-start;
+  align-self: center; /* Centered CTA */
   padding: 13px 32px;
   background: var(--jm-primary);
   color: white;
@@ -391,72 +409,62 @@
 .jm-hero-stack {
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: 16px;
   animation: heroSlideIn var(--jm-transition-slow) 200ms both;
 }
 
 .jm-side-promo {
   flex: 1;
   display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  padding: 18px;
+  align-items: center;
+  justify-content: space-between;
+  border-radius: 14px;
+  padding: 20px;
   overflow: hidden;
+  text-decoration: none;
+  color: #fff;
   position: relative;
-  box-shadow: none;
-  transition: all var(--jm-transition-base);
-  min-height: 0;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 .jm-side-promo:hover {
-  filter: brightness(1.12);
-}
-
-.jm-side-promo__img {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 55%;
-  height: 55%;
-  object-fit: contain;
-  opacity: 0.7;
-  transition: all var(--jm-transition-base);
-}
-
-.jm-side-promo:hover .jm-side-promo__img {
-  opacity: 0.9;
-  transform: scale(1.08) rotate(-3deg);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  color: #fff;
 }
 
 .jm-side-promo__content {
-  position: relative;
-  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  z-index: 1;
 }
 
 .jm-side-promo__tag {
-  display: block;
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.1em;
+  font-size: 0.68rem;
+  font-weight: 600;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.55);
-  margin-bottom: 3px;
+  letter-spacing: 0.8px;
+  opacity: 0.85;
 }
 
 .jm-side-promo__title {
-  display: block;
-  font-size: 17px;
-  font-weight: 900;
-  color: white;
-  letter-spacing: -0.02em;
+  font-size: 1.1rem;
+  font-weight: 700;
 }
 
 .jm-side-promo__price {
-  display: block;
-  font-size: 11px;
+  font-size: 0.82rem;
+  opacity: 0.9;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.65);
-  margin-top: 3px;
+}
+
+.jm-side-promo__img {
+  width: 70px;
+  height: 70px;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
+  z-index: 1;
 }
 
 /* ============================================
@@ -3014,14 +3022,10 @@ a.jm-footer__contact-item:hover {
 
 @media (max-width: 1024px) {
   .jm-hero-section {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr 220px;
   }
 
   .jm-hero-sidebar {
-    display: none;
-  }
-
-  .jm-hero-stack {
     display: none;
   }
 
@@ -3034,12 +3038,7 @@ a.jm-footer__contact-item:hover {
   }
 
   .jm-hero-slide__content {
-    max-width: 75%;
-    padding: 32px 36px;
-  }
-
-  .jm-hero-slide__img {
-    width: 50%;
+    padding: 32px 24px;
   }
 
   .jm-services-bar {
@@ -3065,26 +3064,86 @@ a.jm-footer__contact-item:hover {
 }
 
 @media (max-width: 768px) {
+  .jm-hero-section {
+    grid-template-columns: 1fr;
+    padding: 0;
+    margin-bottom: 0;
+  }
+
   .jm-hero-carousel {
-    min-height: 280px;
+    min-height: 360px;
+    border-radius: 0;
   }
 
-  .jm-hero-title {
-    font-size: 26px;
-  }
-
-  .jm-hero-tag {
-    font-size: 10px;
-    padding: 4px 12px;
-  }
-
-  .jm-hero-cta {
-    padding: 11px 24px;
-    font-size: 12px;
+  .jm-hero-slide {
+    grid-template-columns: 1fr; /* Stack on mobile */
   }
 
   .jm-hero-slide__content {
-    padding: 24px 24px;
+    padding: 32px 24px;
+    justify-content: flex-end; /* Push text to the bottom half on mobile so it's readable over the image */
+    align-items: center;
+    text-align: center;
+    height: 100%;
+    z-index: 3;
+  }
+
+  .jm-hero-slide__img {
+    position: absolute;
+    right: -10%;
+    top: 0;
+    bottom: 0;
+    width: 70%;
+    max-height: 100%;
+    object-fit: contain;
+    opacity: 0.45; /* Keep faded so text pops */
+    z-index: 1;
+    justify-self: center;
+  }
+
+  .jm-hero-title {
+    font-size: 2rem;
+  }
+
+  .jm-hero-sub {
+    max-width: 260px;
+    font-size: 0.95rem;
+  }
+
+  .jm-hero-stack {
+    display: none;
+  }
+
+  .jm-mobile-side-promos {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    padding: 0 16px;
+    margin-top: -8px;
+    margin-bottom: 24px;
+  }
+
+  .jm-mobile-side-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 14px 10px;
+    border-radius: 10px;
+    text-decoration: none;
+    color: #fff;
+    text-align: center;
+    gap: 4px;
+  }
+
+  .jm-mobile-side-card__title {
+    font-size: 0.82rem;
+    font-weight: 700;
+  }
+
+  .jm-mobile-side-card__price {
+    font-size: 0.7rem;
+    opacity: 0.85;
   }
 
   .jm-product-grid--4 { grid-template-columns: repeat(2, 1fr); }
@@ -3193,21 +3252,27 @@ a.jm-footer__contact-item:hover {
   }
 
   .jm-hero-carousel {
-    min-height: 230px;
+    min-height: 280px;
     border-radius: 0;
   }
 
   .jm-hero-title {
-    font-size: 21px;
+    font-size: 24px;
+  }
+
+  .jm-hero-tag {
+    font-size: 10px;
+    padding: 4px 12px;
+  }
+
+  .jm-hero-cta {
+    padding: 11px 24px;
+    font-size: 12px;
   }
 
   .jm-hero-sub,
   .jm-hero-price {
     font-size: 12px;
-  }
-
-  .jm-hero-slide__content {
-    padding: 18px 20px;
   }
 
   .jm-carousel-arrow {
@@ -3315,6 +3380,12 @@ a.jm-footer__contact-item:hover {
   }
 }
 
+@media (min-width: 769px) {
+  .jm-mobile-side-promos {
+    display: none !important;
+  }
+}
+
 /* ============================================
    REDUCED MOTION
    ============================================ */
@@ -3389,20 +3460,4 @@ a.jm-footer__contact-item:hover {
 @media (prefers-contrast: high) {
   .jm-product-card { border: 2px solid var(--jm-text); }
   .jm-add-to-cart-btn { border-width: 3px; }
-}
-/* ═══════ Pull the hero carousel closer to the sidebar ═══════ */
-
-/* Option 1: Reduce the gap between sidebar, carousel, and side promos */
-.jm-hero-section {
-  gap: 8px !important; /* Reduce from whatever it currently is (e.g., 16px, 20px) */
-}
-
-/* Option 2: If the carousel is pushed too far right, pull it left slightly */
-.jm-hero-carousel {
-  margin-left: -8px !important; /* Pulls it closer to the sidebar */
-}
-
-/* Optional: If the slide content (text/button) is too far from the left edge, reduce left padding */
-.jm-hero-slide__content {
-  padding-left: 30px !important; /* Adjust from a larger value if text feels too centered */
 }

@@ -1,5 +1,5 @@
 // src/pages/admin/MessagesPage.jsx
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Icon } from "@iconify/react";
 import api from "../../api/axios";
 import Modal from "./Modal";
@@ -34,11 +34,14 @@ const EMPTY_FORM = {
 
 export default function MessagesPage() {
   const isMobile = useIsMobile();
+  const fileInputRef = useRef(null); // Ref for gallery file input
+  const cameraInputRef = useRef(null); // Ref for camera input
 
   /* ── Existing state ── */
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false); // Upload state
   const [message, setMessage] = useState({ type: "", text: "" });
   const [searchTerm, setSearchTerm] = useState("");
   const [showForm, setShowForm] = useState(false);
@@ -95,6 +98,50 @@ export default function MessagesPage() {
     });
     setEditingMessage(msg);
     setShowForm(true);
+  };
+
+  /* ── Backend Image Upload Handler ── */
+  const handleImageUpload = async (e) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setUploadingImage(true);
+    const formData = new FormData();
+
+    for (let i = 0; i < files.length; i++) {
+      formData.append("images", files[i]);
+    }
+
+    try {
+      const response = await api.post("/upload", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      const uploadedUrls = response.data.urls;
+
+      if (Array.isArray(uploadedUrls) && uploadedUrls.length > 0) {
+        // Messages schema uses a single image string, so we grab the first URL
+        setForm((prev) => ({
+          ...prev,
+          img: uploadedUrls[0], 
+        }));
+        showMessage("success", "Image uploaded successfully");
+      } else {
+        throw new Error("No URLs returned from server");
+      }
+    } catch (error) {
+      console.error(error);
+      showMessage(
+        "error",
+        error.response?.data?.message || "Image upload failed. Please try again."
+      );
+    } finally {
+      setUploadingImage(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      if (cameraInputRef.current) cameraInputRef.current.value = "";
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -276,18 +323,80 @@ export default function MessagesPage() {
                 style={{ background: form.bg, height: '40px' }}
               />
             </div>
+            
+            {/* ── Image Link + Upload Section ── */}
             <div className="col-12">
-              <label className="prod-form__label">Image URL</label>
+              <div className="d-flex align-items-center justify-content-between mb-2">
+                <label className="prod-form__label mb-0">Image</label>
+                <div className="d-flex gap-2">
+                  {/* Hidden camera input */}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    ref={cameraInputRef}
+                    onChange={handleImageUpload}
+                    style={{ display: "none" }}
+                  />
+                  {/* Camera Button */}
+                  <button
+                    type="button"
+                    onClick={() => cameraInputRef.current?.click()}
+                    className="prod-form__add-img-btn"
+                    disabled={uploadingImage}
+                  >
+                    {uploadingImage ? (
+                      <Icon icon="lucide:loader-2" width={14} className="prod-form__spin" />
+                    ) : (
+                      <Icon icon="lucide:camera" width={14} />
+                    )}
+                    Camera
+                  </button>
+
+                  {/* Hidden gallery input */}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    ref={fileInputRef}
+                    onChange={handleImageUpload}
+                    style={{ display: "none" }}
+                  />
+                  {/* Gallery Button */}
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="prod-form__add-img-btn"
+                    disabled={uploadingImage}
+                  >
+                    {uploadingImage ? (
+                      <Icon icon="lucide:loader-2" width={14} className="prod-form__spin" />
+                    ) : (
+                      <Icon icon="lucide:image-plus" width={14} />
+                    )}
+                    Gallery
+                  </button>
+                </div>
+              </div>
+
+              {/* The Link / URL Input Field */}
               <input
                 value={form.img}
                 onChange={(e) => setForm({ ...form, img: e.target.value })}
                 className="form-control prod-form__input"
-                placeholder="https://images.unsplash.com/..."
+                placeholder="Paste image URL here or use Camera/Gallery buttons"
+                disabled={uploadingImage}
               />
+
+              {/* Image Preview */}
               {form.img && (
                 <div className="prod-form__img-preview mt-2">
                   <img src={form.img} alt="Preview" />
-                  <button type="button" onClick={() => setForm({ ...form, img: "" })} className="prod-form__img-remove">
+                  <button 
+                    type="button" 
+                    onClick={() => setForm({ ...form, img: "" })} 
+                    className="prod-form__img-remove"
+                    disabled={uploadingImage}
+                  >
                     <Icon icon="lucide:x" width={12} />
                   </button>
                 </div>
@@ -348,7 +457,11 @@ export default function MessagesPage() {
             <button type="button" onClick={resetForm} className={`prod-form__cancel ${isMobile ? "w-100" : ""}`}>
               Cancel
             </button>
-            <button type="submit" disabled={saving} className={`prod-form__submit ${saving ? "prod-form__submit--saving" : ""} ${isMobile ? "w-100 justify-content-center" : ""}`}>
+            <button 
+              type="submit" 
+              disabled={saving || uploadingImage} 
+              className={`prod-form__submit ${saving ? "prod-form__submit--saving" : ""} ${isMobile ? "w-100 justify-content-center" : ""}`}
+            >
               {saving && <Icon icon="lucide:loader-2" width={16} className="prod-form__spin me-1" />}
               {editingMessage ? "Update Slide" : "Create Slide"}
             </button>

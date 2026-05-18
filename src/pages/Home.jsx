@@ -1,12 +1,12 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link, useSearchParams, useLocation } from "react-router-dom";
 import { Icon } from "@iconify/react";
 import api from "../api/axios";
 import { useCart } from "../context/CartContext";
-import { useAuth } from "../context/AuthContext"; // ✅ NEW
+import { useAuth } from "../context/AuthContext";
 import "./Home.css";
 
-const DEFAULT_SLIDES = [
+const   DEFAULT_SLIDES = [
   { bg: "linear-gradient(135deg, #f68b1e 0%, #e8590c 100%)", tag: "MEGA SALE", title: "Up to 70% OFF", sub: "On all electronics & gadgets", price: "Prices from ₦5,000", img: "https://images.unsplash.com/photo-1498049794561-7780e7231661?w=800&q=80" },
   { bg: "linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)", tag: "TECH WEEK", title: "Phones & Laptops", sub: "Best deals on top brands", price: "Starting from ₦25,000", img: "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=800&q=80" },
   { bg: "linear-gradient(135deg, #6c5ce7 0%, #a29bfe 100%)", tag: "NEW ARRIVALS", title: "Laptops & MacBooks", sub: "Latest models in stock", price: "From ₦85,000", img: "https://images.unsplash.com/photo-1496181133206-80ce9b88a853?w=800&q=80" },
@@ -14,7 +14,7 @@ const DEFAULT_SLIDES = [
 ];
 
 const DEFAULT_SIDE_PROMOS = [
-  { bg: "linear-gradient(135deg, #1a1a2e, #2d3436)", tag: "Official Store", title: "Apple", price: "From ₦250k", img: "https://images.unsplash.com/photo-1592750475338-74b7b21085ab?w=200&q=80" },
+  { bg: "linear-gradient(135deg, #e9e9f1, #2d3436)", tag: "Official Store", title: "Apple", price: "From ₦250k", img: "https://images.unsplash.com/photo-1592750475338-74b7b21085ab?w=200&q=80" },
   { bg: "linear-gradient(135deg, #0984e3, #74b9ff)", tag: "Tech Week", title: "Laptops", price: "From ₦85k", img: "https://images.unsplash.com/photo-1496181133206-80ce9b88a853?w=200&q=80" },
   { bg: "linear-gradient(135deg, #6c5ce7, #a29bfe)", tag: "Premium Build", title: "MacBooks", price: "From ₦450k", img: "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=200&q=80" },
 ];
@@ -91,7 +91,6 @@ const pad = (n) => String(n).padStart(2, "0");
 
 const getSubIcon = (subName) => SUBCATEGORY_ICON_MAP[subName] || "lucide:tag";
 
-// ✅ NEW: Calculate margin from engineering price
 const calcMargin = (p) => {
   const engPrice = p.engineeringPrice ? Number(p.engineeringPrice) : 0;
   const sellPrice = p.discountPrice ? Number(p.discountPrice) : Number(p.price) || 0;
@@ -101,7 +100,6 @@ const calcMargin = (p) => {
   return { amount: marginAmt, pct: marginPct };
 };
 
-// ✅ NEW: Format engineering price for display
 const formatEngPrice = (p, currency = "₦") => {
   if (!p.engineeringPrice) return null;
   return `${currency}${Number(p.engineeringPrice).toLocaleString()}`;
@@ -121,16 +119,6 @@ const getPrimaryImage = (p, fallback = "") => {
   return imgs.length > 0 ? imgs[0] : fallback;
 };
 
-const groupByCategory = (list) => {
-  const map = {};
-  list.forEach((p) => {
-    const cat = p.category || "Uncategorized";
-    if (!map[cat]) map[cat] = [];
-    map[cat].push(p);
-  });
-  return map;
-};
-
 const priceRange = (items, currency) => {
   if (!items.length) return "";
   const prices = items.map((i) => i.price || 0).filter(Boolean);
@@ -141,9 +129,9 @@ const priceRange = (items, currency) => {
 };
 
 // ═══════ DropdownProductPreview ═══════
-const DropdownProductPreview = ({ p, currency, onClose, canSeeEngPricing }) => { // ✅ Added canSeeEngPricing
+const DropdownProductPreview = ({ p, currency, onClose, canSeeEngPricing }) => {
   const pct = discountPct(p);
-  const margin = canSeeEngPricing ? calcMargin(p) : null; // ✅ NEW
+  const margin = canSeeEngPricing ? calcMargin(p) : null;
 
   return (
     <Link to={`/product/${p._id}`} className="jm-mega-product" onClick={onClose}>
@@ -159,7 +147,6 @@ const DropdownProductPreview = ({ p, currency, onClose, canSeeEngPricing }) => {
             <span className="jm-mega-product__old">{currency}{p.price.toLocaleString()}</span>
           )}
         </div>
-        {/* ✅ NEW: Engineering margin for admin/engineer */}
         {canSeeEngPricing && margin && (
           <span className="jm-mega-product__margin" style={{ color: margin.amount >= 0 ? "#2b8a3e" : "#e03131" }}>
             M: {currency}{margin.amount.toLocaleString()} ({margin.pct}%)
@@ -171,7 +158,7 @@ const DropdownProductPreview = ({ p, currency, onClose, canSeeEngPricing }) => {
 };
 
 // ═══════ ProductCard ═══════
-const ProductCard = ({ p, prefix = "", showProgress = false, showNew = false, compact = false, flash = false, currency, cartQty, isSyncing, onAddToCart, canSeeEngPricing }) => { // ✅ Added canSeeEngPricing
+const ProductCard = ({ p, prefix = "", showProgress = false, showNew = false, compact = false, flash = false, currency, cartQty, isSyncing, onAddToCart, canSeeEngPricing }) => {
   const [imgIndex, setImgIndex] = useState(0);
   const allImages = getProductImages(p);
   const hasMultiple = allImages.length > 1;
@@ -189,7 +176,6 @@ const ProductCard = ({ p, prefix = "", showProgress = false, showNew = false, co
   const isOutOfStock = p.countInStock === 0;
   const isMaxStock = p.countInStock > 0 && cartQty >= p.countInStock;
 
-  // ✅ NEW: Compute engineering price display
   const engPriceFormatted = canSeeEngPricing ? formatEngPrice(p, currency) : null;
   const margin = canSeeEngPricing ? calcMargin(p) : null;
 
@@ -250,7 +236,6 @@ const ProductCard = ({ p, prefix = "", showProgress = false, showNew = false, co
           <span className="jm-product-card__save" style={flash ? { color: "rgba(255,255,255,0.7)" } : undefined}>You save {currency}{(p.price - p.discountPrice).toLocaleString()}</span>
         )}
 
-        {/* ✅ NEW: Engineering price + margin (admin/engineer only) */}
         {canSeeEngPricing && engPriceFormatted && (
           <div className="jm-product-card__eng-info" style={flash ? { background: "rgba(255,255,255,0.08)", borderColor: "rgba(255,255,255,0.12)" } : undefined}>
             <span className="jm-product-card__eng-price" style={flash ? { color: "rgba(255,255,255,0.65)" } : undefined}>
@@ -313,7 +298,6 @@ function ScrollToTop() {
 
   useEffect(() => {
     window.scrollTo(0, 0);
-
     const dashboardContainer = document.getElementById("dashboard-scroll-container");
     if (dashboardContainer) {
       dashboardContainer.scrollTo(0, 0);
@@ -325,8 +309,8 @@ function ScrollToTop() {
 
 // ═══════ MAIN HOME COMPONENT ═══════
 export default function Home() {
-  const { user } = useAuth(); // ✅ NEW: Get the logged-in user
-  const canSeeEngPricing = user?.role === "admin" || user?.role === "engineer"; // ✅ NEW
+  const { user } = useAuth();
+  const canSeeEngPricing = user?.role === "admin" || user?.role === "engineer";
 
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -336,16 +320,7 @@ export default function Home() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [timeLeft, setTimeLeft] = useState({ h: 8, m: 45, s: 12 });
   const [activeCat, setActiveCat] = useState("");
-  const [catDropdownOpen, setCatDropdownOpen] = useState(false);
-  const [catSearch, setCatSearch] = useState("");
-  const [mobileCatDrawer, setMobileCatDrawer] = useState(false);
-  const [hoveredSidebarCat, setHoveredSidebarCat] = useState(null);
-  const [mobileExpandedCat, setMobileExpandedCat] = useState(null);
   const [productCategories, setProductCategories] = useState({});
-  const catScrollRef = useRef(null);
-  const dropdownRef = useRef(null);
-  const mobileDrawerRef = useRef(null);
-  const sidebarRef = useRef(null);
 
   const { addToCart = () => {}, cart = [], isSyncing = false } = useCart();
 
@@ -394,7 +369,6 @@ export default function Home() {
   const officialStores = siteSettings?.officialStores?.length > 0 ? siteSettings.officialStores : DEFAULT_STORES;
 
   const sidebarCategories = categories.filter(c => c.showInSidebar !== false);
-  const homeCategories = categories.filter(c => c.showInHome !== false);
 
   const flashSaleProducts = products.filter(p => parseBool(p.isFlashSale));
   const featuredProducts = products.filter(p => parseBool(p.isFeatured));
@@ -411,26 +385,12 @@ export default function Home() {
   }, [products, activeSearch]);
 
   useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) setCatDropdownOpen(false);
-      if (mobileDrawerRef.current && !mobileDrawerRef.current.contains(e.target)) setMobileCatDrawer(false);
-      if (sidebarRef.current && !sidebarRef.current.contains(e.target)) setHoveredSidebarCat(null);
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    document.addEventListener("touchstart", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("touchstart", handleClickOutside);
-    };
-  }, []);
-
-  useEffect(() => {
     const fetchAll = async () => {
       try {
         const [catRes, setRes, groupedRes, msgRes] = await Promise.all([
           api.get("/categories?isActive=true&limit=1000"),
           api.get("/site-settings"),
-          api.get("/products/grouped"),  // ✅ optionalAuth on backend will include engineeringPrice for admin/engineer
+          api.get("/products/grouped"),
           api.get("/messages?active=true"),
         ]);
 
@@ -494,10 +454,8 @@ export default function Home() {
   const handleAddToCart = async (e, product) => {
     e.preventDefault();
     e.stopPropagation();
-
     const currentQty = getCartQty(product._id);
     if (product.countInStock > 0 && currentQty >= product.countInStock) return;
-
     try {
       await addToCart({
         _id: product._id,
@@ -510,27 +468,9 @@ export default function Home() {
     }
   };
 
-  const handleCatSelect = (cat) => {
-    setActiveCat(cat);
-    setCatDropdownOpen(false);
-    setCatSearch("");
-    setMobileCatDrawer(false);
-  };
-
-  const getSubcategories = (catName) => {
-    const found = categories.find(c => c.name === catName);
-    if (found?.subcategories?.length > 0) return found.subcategories;
-    if (found?.children?.length > 0) return found.children.map(c => c.name || c);
-    return null;
-  };
-
   const sidebarItems = sidebarCategories.length > 0
     ? sidebarCategories.map(c => ({ id: c._id, name: c.name, icon: c.icon }))
     : [];
-
-  const filteredCatKeys = Object.keys(productCategories).filter(cat =>
-    cat.toLowerCase().includes(catSearch.toLowerCase())
-  );
 
   return (
     <div className="jm-home">
@@ -567,7 +507,7 @@ export default function Home() {
                   cartQty={getCartQty(p._id)}
                   isSyncing={isSyncing}
                   onAddToCart={handleAddToCart}
-                  canSeeEngPricing={canSeeEngPricing} // ✅ NEW
+                  canSeeEngPricing={canSeeEngPricing}
                 />
               ))}
             </div>
@@ -588,109 +528,6 @@ export default function Home() {
 
       {/* ═══════ HERO SECTION ═══════ */}
       <section className="jm-hero-section">
-        <div className="jm-hero-sidebar" ref={sidebarRef}>
-          <ul className="jm-sidebar-list">
-            {sidebarItems.map((cat) => {
-              const subs = getSubcategories(cat.name);
-              const catProducts = productCategories[cat.name] || [];
-              const hasDropdown = subs && subs.length > 0;
-              const isHovered = hoveredSidebarCat === cat.id;
-              const topProducts = catProducts.slice(0, 4);
-
-              return (
-                <li
-                  key={cat.id}
-                  className={`jm-sidebar-item ${hasDropdown ? "jm-sidebar-item--has-dropdown" : ""}`}
-                  onMouseEnter={() => hasDropdown && setHoveredSidebarCat(cat.id)}
-                  onMouseLeave={() => setHoveredSidebarCat(null)}
-                >
-                  <Link to={`/products?category=${cat.name}`} className="jm-sidebar-item__link">
-                    <Icon icon={cat.icon || "lucide:chevron-right"} width={14} className="jm-sidebar-item__icon" />
-                    <span className="jm-sidebar-item__text">{cat.name}</span>
-                    {hasDropdown && <Icon icon="lucide:chevron-right" width={12} className="jm-sidebar-item__expand-icon" />}
-                  </Link>
-
-                  {hasDropdown && (
-                    <div className={`jm-sidebar-dropdown ${isHovered ? "jm-sidebar-dropdown--open" : ""} ${topProducts.length > 0 ? "jm-sidebar-dropdown--has-products" : ""}`}>
-                      <div className="jm-sidebar-dropdown__arrow" />
-                      <div className="jm-sidebar-dropdown__panel">
-                        <div className="jm-sidebar-dropdown__head">
-                          <div className="jm-sidebar-dropdown__head-left">
-                            <div className="jm-sidebar-dropdown__head-icon">
-                              <Icon icon={cat.icon || getCatIcon(cat.name)} width={16} />
-                            </div>
-                            <div>
-                              <span className="jm-sidebar-dropdown__title">{cat.name}</span>
-                              <span className="jm-sidebar-dropdown__count">{catProducts.length} products</span>
-                            </div>
-                          </div>
-                          <Link to={`/products?category=${cat.name}`} className="jm-sidebar-dropdown__viewall" onClick={() => setHoveredSidebarCat(null)}>
-                            View All <Icon icon="lucide:arrow-right" width={12} />
-                          </Link>
-                        </div>
-
-                        <div className="jm-sidebar-dropdown__body">
-                          <div className="jm-sidebar-dropdown__subs-col">
-                            <div className="jm-sidebar-dropdown__subs-label">Subcategories</div>
-                            <div className="jm-sidebar-dropdown__grid">
-                              {subs.map((sub, subIdx) => (
-                                <Link
-                                  key={subIdx}
-                                  to={`/products?category=${cat.name}&sub=${encodeURIComponent(sub)}`}
-                                  className="jm-sidebar-dropdown__item"
-                                  onClick={() => setHoveredSidebarCat(null)}
-                                >
-                                  <div className="jm-sidebar-dropdown__item-icon">
-                                    <Icon icon={getSubIcon(sub)} width={14} />
-                                  </div>
-                                  <span className="jm-sidebar-dropdown__item-text">{sub}</span>
-                                  <Icon icon="lucide:chevron-right" width={12} className="jm-sidebar-dropdown__item-arrow" />
-                                </Link>
-                              ))}
-                            </div>
-                          </div>
-
-                          {topProducts.length > 0 && (
-                            <div className="jm-sidebar-dropdown__products-col">
-                              <div className="jm-sidebar-dropdown__products-label">
-                                <Icon icon="lucide:sparkles" width={12} />
-                                Top picks
-                              </div>
-                              <div className="jm-sidebar-dropdown__products-list">
-                                {topProducts.map((p) => (
-                                  <DropdownProductPreview
-                                    key={p._id}
-                                    p={p}
-                                    currency={currency}
-                                    onClose={() => setHoveredSidebarCat(null)}
-                                    canSeeEngPricing={canSeeEngPricing} // ✅ NEW
-                                  />
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
-                        {catProducts.length > 0 && (
-                          <div className="jm-sidebar-dropdown__foot">
-                            <div className="jm-sidebar-dropdown__foot-info">
-                              <Icon icon="lucide:tag" width={12} />
-                              <span>Starting from {priceRange(catProducts, currency)}</span>
-                            </div>
-                            <Link to={`/products?category=${cat.name}`} className="jm-sidebar-dropdown__foot-link" onClick={() => setHoveredSidebarCat(null)}>
-                              Browse all <Icon icon="lucide:external-link" width={11} />
-                            </Link>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-
         <div className="jm-hero-carousel">
           {heroSlides.map((slide, idx) => (
             <div key={idx} className="jm-hero-slide" style={{ opacity: idx === currentSlide ? 1 : 0, zIndex: idx === currentSlide ? 1 : 0 }}>
@@ -729,98 +566,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Mobile category trigger */}
-      <div className="jm-mobile-cat-trigger-wrap">
-        <button className="jm-mobile-cat-trigger" onClick={() => setMobileCatDrawer(true)}>
-          <Icon icon="lucide:layout-grid" width={18} />
-          <span>Browse Categories</span>
-          <Icon icon="lucide:chevron-right" width={16} />
-        </button>
-      </div>
-
-      {mobileCatDrawer && <div className="jm-mobile-cat-overlay" onClick={() => setMobileCatDrawer(false)} />}
-
-      <div ref={mobileDrawerRef} className={`jm-mobile-cat-drawer ${mobileCatDrawer ? "jm-mobile-cat-drawer--open" : ""}`}>
-        <div className="jm-mobile-cat-drawer__header">
-          <h3>Categories</h3>
-          <button className="jm-mobile-cat-drawer__close" onClick={() => setMobileCatDrawer(false)}><Icon icon="lucide:x" width={20} /></button>
-        </div>
-        <div className="jm-mobile-cat-drawer__search">
-          <Icon icon="lucide:search" width={16} />
-          <input type="text" placeholder="Search categories..." value={catSearch} onChange={(e) => setCatSearch(e.target.value)} />
-        </div>
-        <ul className="jm-mobile-cat-drawer__list">
-          {sidebarItems.filter(c => c.name.toLowerCase().includes(catSearch.toLowerCase())).map((cat) => {
-            const subs = getSubcategories(cat.name);
-            const catProducts = productCategories[cat.name] || [];
-            const isExpanded = mobileExpandedCat === cat.id;
-            const previewProducts = catProducts.slice(0, 3);
-
-            return (
-              <li key={cat.id} className="jm-mobile-cat-drawer__item">
-                <div className="jm-mobile-cat-drawer__item-header">
-                  <Link to={`/products?category=${cat.name}`} onClick={() => setMobileCatDrawer(false)}>
-                    <Icon icon={cat.icon || "lucide:chevron-right"} width={16} />
-                    <span>{cat.name}</span>
-                    {catProducts.length > 0 && <span className="jm-mobile-cat-drawer__badge">{catProducts.length}</span>}
-                  </Link>
-                  {subs && subs.length > 0 && (
-                    <button className="jm-mobile-cat-drawer__expand" onClick={() => setMobileExpandedCat(isExpanded ? null : cat.id)} aria-expanded={isExpanded}>
-                      <Icon icon="lucide:chevron-down" width={16} />
-                    </button>
-                  )}
-                </div>
-
-                {subs && subs.length > 0 && (
-                  <div className={`jm-mobile-cat-drawer__expandable ${isExpanded ? "jm-mobile-cat-drawer__expandable--open" : ""}`}>
-                    <div className="jm-mobile-cat-drawer__subs">
-                      {subs.map((sub, subIdx) => (
-                        <Link to={`/products?category=${cat.name}&sub=${encodeURIComponent(sub)}`} key={subIdx} className="jm-mobile-cat-drawer__sub" onClick={() => setMobileCatDrawer(false)}>
-                          <Icon icon={getSubIcon(sub)} width={14} />
-                          <span>{sub}</span>
-                        </Link>
-                      ))}
-                    </div>
-
-                    {previewProducts.length > 0 && (
-                      <div className="jm-mobile-cat-drawer__products">
-                        <div className="jm-mobile-cat-drawer__products-label">Popular in {cat.name}</div>
-                        <div className="jm-mobile-cat-drawer__products-list">
-                          {previewProducts.map((p) => {
-                            const pMargin = canSeeEngPricing ? calcMargin(p) : null; // ✅ NEW
-                            return (
-                              <Link to={`/product/${p._id}`} key={p._id} className="jm-mobile-cat-drawer__product" onClick={() => setMobileCatDrawer(false)}>
-                                <img src={getPrimaryImage(p, `https://picsum.photos/seed/mob${p._id}/100/100`)} alt={p.name} />
-                                <div className="jm-mobile-cat-drawer__product-info">
-                                  <span className="jm-mobile-cat-drawer__product-name">{p.name}</span>
-                                  <span className="jm-mobile-cat-drawer__product-price">{currency}{(p.discountPrice || p.price)?.toLocaleString()}</span>
-                                  {/* ✅ NEW: Margin for admin/engineer in mobile drawer */}
-                                  {canSeeEngPricing && pMargin && (
-                                    <span className="jm-mobile-cat-drawer__product-margin" style={{ fontSize: "0.65rem", fontWeight: 600, color: pMargin.amount >= 0 ? "#2b8a3e" : "#e03131" }}>
-                                      M: {currency}{pMargin.amount.toLocaleString()} ({pMargin.pct}%)
-                                    </span>
-                                  )}
-                                </div>
-                              </Link>
-                            );
-                          })}
-                        </div>
-                        <Link to={`/products?category=${cat.name}`} className="jm-mobile-cat-drawer__products-seeall" onClick={() => setMobileCatDrawer(false)}>
-                          See all {catProducts.length} products <Icon icon="lucide:arrow-right" width={14} />
-                        </Link>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </li>
-            );
-          })}
-          {sidebarItems.filter(c => c.name.toLowerCase().includes(catSearch.toLowerCase())).length === 0 && (
-            <li className="jm-mobile-cat-drawer__empty">No categories found</li>
-          )}
-        </ul>
-      </div>
-
       {/* Mobile side promos */}
       <div className="jm-mobile-side-promos">
         {sidePromos.slice(0, 3).map((promo, idx) => (
@@ -846,39 +591,6 @@ export default function Home() {
             </div>
           </div>
         ))}
-      </section>
-
-      {/* ═══════ CATEGORY ICONS ═══════ */}
-      <section className="jm-section">
-        <div className="jm-section__header">
-          <h2 className="jm-section__title">CATEGORIES</h2>
-          <Link to="/products" className="jm-section__see-all">SEE ALL <Icon icon="lucide:chevron-right" width={14} /></Link>
-        </div>
-        <div className="jm-category-row">
-          {homeCategories.length > 0 ? homeCategories.map((cat) => {
-            const catProducts = productCategories[cat.name] || [];
-            return (
-              <Link to={`/products?category=${cat.name}`} key={cat._id} className="jm-category-icon">
-                <div className="jm-category-icon__circle">
-                  {cat.image ? <img src={cat.image} alt={cat.name} className="jm-category-icon__img" /> : <Icon icon={cat.icon || "lucide:package"} width={26} />}
-                </div>
-                <span className="jm-category-icon__name">{cat.name}</span>
-                {catProducts.length > 0 && <span className="jm-category-icon__price">{priceRange(catProducts, currency)}</span>}
-              </Link>
-            );
-          }) : [
-            { name: "Phones", icon: "lucide:smartphone" }, { name: "Laptops", icon: "lucide:laptop" },
-            { name: "MacBooks", icon: "lucide:monitor" }, { name: "Home", icon: "lucide:sofa" },
-            { name: "Appliances", icon: "lucide:refrigerator" }, { name: "Audio", icon: "lucide:speaker" },
-            { name: "Gaming", icon: "lucide:gamepad-2" }, { name: "Health", icon: "lucide:heart-pulse" },
-            { name: "Computing", icon: "lucide:cpu" }, { name: "Accessories", icon: "lucide:headphones" },
-          ].map((cat) => (
-            <Link to="/products" key={cat.name} className="jm-category-icon">
-              <div className="jm-category-icon__circle"><Icon icon={cat.icon} width={26} /></div>
-              <span className="jm-category-icon__name">{cat.name}</span>
-            </Link>
-          ))}
-        </div>
       </section>
 
       {/* ═══════ FLASH SALES ═══════ */}
@@ -964,7 +676,7 @@ export default function Home() {
         </section>
       )}
 
-      {/* ═══════ PRODUCT CATALOGUE WITH DROPDOWN ═══════ */}
+      {/* ═══════ PRODUCT CATALOGUE WITH SELECT DROPDOWN ═══════ */}
       {!loading && Object.keys(productCategories).length > 0 && (
         <section className="jm-catalogue-section">
           <div className="jm-section">
@@ -973,51 +685,30 @@ export default function Home() {
                 <Icon icon="lucide:layout-grid" width={18} className="jm-section__header-icon" />
                 <h2 className="jm-section__title">PRODUCT CATALOGUE</h2>
               </div>
+              <Link to="/products" className="jm-section__see-all">VIEW ALL <Icon icon="lucide:chevron-right" width={14} /></Link>
             </div>
-            <div className="jm-cat-tabs" ref={catScrollRef}>
-              {Object.keys(productCategories).map((cat) => (
-                <button key={cat} className={`jm-cat-tab ${activeCat === cat ? "jm-cat-tab--active" : ""}`} onClick={() => handleCatSelect(cat)}>
-                  {cat}<span className="jm-cat-tab__count">({productCategories[cat].length})</span>
-                </button>
-              ))}
-            </div>
-            <div className="jm-cat-dropdown-wrap" ref={dropdownRef}>
-              <button className="jm-cat-dropdown-trigger" onClick={() => { setCatDropdownOpen(!catDropdownOpen); setCatSearch(""); }} aria-expanded={catDropdownOpen} aria-haspopup="listbox">
-                <div className="jm-cat-dropdown-trigger__left">
-                  <div className="jm-cat-dropdown-trigger__icon"><Icon icon={getCatIcon(activeCat)} width={18} /></div>
-                  <div className="jm-cat-dropdown-trigger__text">
-                    <span className="jm-cat-dropdown-trigger__label">{activeCat}</span>
-                    <span className="jm-cat-dropdown-trigger__meta">{productCategories[activeCat]?.length || 0} products · {priceRange(productCategories[activeCat] || [], currency)}</span>
-                  </div>
-                </div>
-                <Icon icon="lucide:chevron-down" width={18} className={`jm-cat-dropdown-trigger__arrow ${catDropdownOpen ? "jm-cat-dropdown-trigger__arrow--open" : ""}`} />
-              </button>
-              <div className={`jm-cat-dropdown-menu ${catDropdownOpen ? "jm-cat-dropdown-menu--open" : ""}`} role="listbox">
-                <div className="jm-cat-dropdown-menu__search">
-                  <Icon icon="lucide:search" width={16} />
-                  <input type="text" placeholder="Search categories..." value={catSearch} onChange={(e) => setCatSearch(e.target.value)} autoFocus={catDropdownOpen} />
-                  {catSearch && <button className="jm-cat-dropdown-menu__clear" onClick={() => setCatSearch("")}><Icon icon="lucide:x" width={14} /></button>}
-                </div>
-                <div className="jm-cat-dropdown-menu__list">
-                  {filteredCatKeys.length > 0 ? filteredCatKeys.map((cat) => (
-                    <button key={cat} className={`jm-cat-dropdown-menu__item ${activeCat === cat ? "jm-cat-dropdown-menu__item--active" : ""}`} onClick={() => handleCatSelect(cat)} role="option" aria-selected={activeCat === cat}>
-                      <div className="jm-cat-dropdown-menu__item-left"><Icon icon={getCatIcon(cat)} width={16} /><span>{cat}</span></div>
-                      <div className="jm-cat-dropdown-menu__item-right">
-                        <span className="jm-cat-dropdown-menu__item-range">{priceRange(productCategories[cat], currency)}</span>
-                        <span className="jm-cat-dropdown-menu__item-count">{productCategories[cat].length}</span>
-                        {activeCat === cat && <Icon icon="lucide:check" width={14} className="jm-cat-dropdown-menu__item-check" />}
-                      </div>
-                    </button>
-                  )) : (
-                    <div className="jm-cat-dropdown-menu__empty"><Icon icon="lucide:search-x" width={32} /><p>No categories found</p></div>
-                  )}
-                </div>
-                <div className="jm-cat-dropdown-menu__footer">
-                  <Link to="/products" className="jm-cat-dropdown-menu__viewall" onClick={() => setCatDropdownOpen(false)}><Icon icon="lucide:grid-3x3" width={14} /> View All Products</Link>
-                </div>
+
+            {/* ═══════ SELECT DROPDOWN FOR CATEGORIES ═══════ */}
+            <div className="jm-cat-select-wrap">
+              <div className="jm-cat-select__icon">
+                <Icon icon={getCatIcon(activeCat)} width={18} />
               </div>
+              <select
+                className="jm-cat-select"
+                value={activeCat}
+                onChange={(e) => setActiveCat(e.target.value)}
+                aria-label="Select a category"
+              >
+                {Object.keys(productCategories).map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat}  ·  {productCategories[cat].length} products  ·  {priceRange(productCategories[cat], currency)}
+                  </option>
+                ))}
+              </select>
+              <Icon icon="lucide:chevron-down" width={16} className="jm-cat-select__arrow" />
             </div>
           </div>
+
           {activeCat && productCategories[activeCat] && (
             <div className="jm-section jm-catalogue-products">
               <div className="jm-section__header">
@@ -1072,7 +763,7 @@ export default function Home() {
             {products.filter((p) => p.discountPrice && p.price).sort((a, b) => ((b.price - b.discountPrice) / b.price) - ((a.price - a.discountPrice) / a.price)).slice(0, 6).map((p) => {
               const pct = discountPct(p);
               const saved = p.price - p.discountPrice;
-              const dropMargin = canSeeEngPricing ? calcMargin(p) : null; // ✅ NEW
+              const dropMargin = canSeeEngPricing ? calcMargin(p) : null;
               return (
                 <Link to={`/product/${p._id}`} key={`drop-${p._id}`} className="jm-price-drop-card">
                   <div className="jm-price-drop-card__img-wrap">
@@ -1086,7 +777,6 @@ export default function Home() {
                       <span className="jm-price-drop-card__old">{currency}{p.price.toLocaleString()}</span>
                     </div>
                     <span className="jm-price-drop-card__save">Save {currency}{saved.toLocaleString()}</span>
-                    {/* ✅ NEW: Engineering margin for admin/engineer */}
                     {canSeeEngPricing && dropMargin && (
                       <span className="jm-price-drop-card__margin" style={{ color: dropMargin.amount >= 0 ? "#2b8a3e" : "#e03131" }}>
                         Margin: {currency}{dropMargin.amount.toLocaleString()} ({dropMargin.pct}%)
@@ -1126,7 +816,8 @@ export default function Home() {
           </div>
         </section>
       ))}
-            {/* ═══════ WHY SHOP WITH US ═══════ */}
+
+      {/* ═══════ WHY SHOP WITH US ═══════ */}
       <section className="jm-section jm-trust-section">
         <div className="jm-section__header"><h2 className="jm-section__title">WHY SHOP WITH US</h2></div>
         <div className="jm-trust-grid">
@@ -1337,7 +1028,7 @@ export default function Home() {
         .jm-product-card--compact .jm-product-card__img-dot { width: 5px; height: 5px; }
         .jm-product-card--compact .jm-product-card__img-dots { bottom: 8px; gap: 3px; }
 
-        /* ═══════ ✅ NEW: Engineering Price & Margin in Product Card ═══════ */
+        /* ═══════ Engineering Price & Margin in Product Card ═══════ */
         .jm-product-card__eng-info {
           display: flex;
           flex-direction: column;
@@ -1362,7 +1053,7 @@ export default function Home() {
           font-size: 0.72rem;
         }
 
-        /* ═══════ ✅ NEW: Margin in Mega Dropdown ═══════ */
+        /* ═══════ Margin in Mega Dropdown ═══════ */
         .jm-mega-product__margin {
           display: block;
           font-size: 0.65rem;
@@ -1370,7 +1061,7 @@ export default function Home() {
           margin-top: 1px;
         }
 
-        /* ═══════ ✅ NEW: Margin in Price Drop Card ═══════ */
+        /* ═══════ Margin in Price Drop Card ═══════ */
         .jm-price-drop-card__margin {
           display: block;
           font-size: 0.72rem;
@@ -1378,10 +1069,104 @@ export default function Home() {
           margin-top: 2px;
         }
 
-        /* ═══════ ✅ NEW: Margin in Mobile Drawer Product ═══════ */
-        .jm-mobile-cat-drawer__product-margin {
-          display: block;
-          margin-top: 1px;
+        /* ═══════ Category Select Dropdown ═══════ */
+        .jm-cat-select-wrap {
+          position: relative;
+          display: flex;
+          align-items: center;
+          max-width: 460px;
+          width: 100%;
+          margin-bottom: 20px;
+        }
+
+        .jm-cat-select__icon {
+          position: absolute;
+          left: 14px;
+          z-index: 1;
+          color: #868e96;
+          pointer-events: none;
+          display: flex;
+          align-items: center;
+          transition: color 0.2s ease;
+        }
+
+        .jm-cat-select-wrap:focus-within .jm-cat-select__icon {
+          color: #f68b1e;
+        }
+
+        .jm-cat-select {
+          width: 100%;
+          padding: 12px 40px 12px 42px;
+          font-size: 0.92rem;
+          font-weight: 500;
+          font-family: inherit;
+          border: 2px solid #e9ecef;
+          border-radius: 12px;
+          background: #fff;
+          color: #212529;
+          cursor: pointer;
+          appearance: none;
+          -webkit-appearance: none;
+          -moz-appearance: none;
+          outline: none;
+          transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.15s ease;
+          line-height: 1.4;
+        }
+
+        .jm-cat-select:hover {
+          border-color: #ced4da;
+          background: #fafbfc;
+        }
+
+        .jm-cat-select:focus {
+          border-color: #f68b1e;
+          box-shadow: 0 0 0 3px rgba(246, 139, 30, 0.15);
+        }
+
+        .jm-cat-select:active {
+          border-color: #e07b0f;
+        }
+
+        .jm-cat-select__arrow {
+          position: absolute;
+          right: 14px;
+          color: #868e96;
+          pointer-events: none;
+          display: flex;
+          align-items: center;
+          transition: color 0.2s ease, transform 0.2s ease;
+        }
+
+        .jm-cat-select-wrap:focus-within .jm-cat-select__arrow {
+          color: #f68b1e;
+          transform: rotate(180deg);
+        }
+
+        .jm-cat-select option {
+          padding: 10px 14px;
+          font-size: 0.88rem;
+          font-weight: 400;
+          line-height: 1.5;
+        }
+
+        @media (max-width: 768px) {
+          .jm-cat-select-wrap {
+            max-width: 100%;
+          }
+
+          .jm-cat-select {
+            padding: 11px 36px 11px 38px;
+            font-size: 0.88rem;
+            border-radius: 10px;
+          }
+
+          .jm-cat-select__icon {
+            left: 12px;
+          }
+
+          .jm-cat-select__arrow {
+            right: 12px;
+          }
         }
       `}</style>
 

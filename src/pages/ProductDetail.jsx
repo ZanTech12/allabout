@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { Icon } from "@iconify/react";
 import { useCart } from "../context/CartContext";
+import { useAuth } from "../context/AuthContext"; // ✅ NEW: Import useAuth
 import api from "../api/axios";
 import "./ProductDetail.css";
 
@@ -20,17 +21,24 @@ export default function ProductDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { addToCart, cart } = useCart();
+  const { user } = useAuth(); // ✅ NEW: Get user for role check
 
   const [product, setProduct] = useState(null);
+  const [siteSettings, setSiteSettings] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [qty, setQty] = useState(1);
   const [addedFeedback, setAddedFeedback] = useState(false);
   const [activeImg, setActiveImg] = useState(0);
 
+  // ✅ NEW: Permission check for Engineering Price
+  const canSeeEngPricing = user?.role === "admin" || user?.role === "engineer";
+
   useEffect(() => {
     const fetchProduct = async () => {
       try {
+        // The api instance automatically attaches the auth token, 
+        // so the backend optionalAuth middleware will return engineeringPrice if allowed
         const { data } = await api.get(`/products/${id}`);
         setProduct(data);
         setActiveImg(0); // Reset image index on product change
@@ -42,6 +50,25 @@ export default function ProductDetail() {
     };
     fetchProduct();
   }, [id]);
+
+  // ✅ Fetch Site Settings for dynamic delivery/return/company info
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const { data } = await api.get("/site-settings");
+        setSiteSettings(data);
+      } catch (err) {
+        console.error("Could not load site settings", err);
+      }
+    };
+    fetchSettings();
+  }, []);
+
+  // ✅ Destructure settings with fallback defaults
+  const companyName = siteSettings?.companyName || "MallHub";
+  const currency = siteSettings?.currency || "₦";
+  const freeDeliveryThreshold = siteSettings?.freeDeliveryThreshold || 15000;
+  const returnDays = siteSettings?.returnDays || 30;
 
   const getCartQty = () => {
     const item = cart.find((c) => c.product === product?._id);
@@ -55,17 +82,31 @@ export default function ProductDetail() {
     );
   };
 
+  const currentPrice = product?.discountPrice && product?.discountPrice < product?.price 
+    ? product.discountPrice 
+    : product?.price;
+
+  // ✅ NEW: Calculate Margin for Admins/Engineers
+  const calcMargin = () => {
+    if (!product?.engineeringPrice || !currentPrice) return null;
+    const engPrice = Number(product.engineeringPrice);
+    const sellPrice = Number(currentPrice);
+    if (engPrice <= 0 || sellPrice <= 0) return null;
+    const marginAmt = sellPrice - engPrice;
+    const marginPct = ((marginAmt / sellPrice) * 100).toFixed(1);
+    return { amount: marginAmt, pct: marginPct };
+  };
+
   const handleAddToCart = () => {
     if (!product || product.countInStock === 0) return;
     
-    // ✅ Get images array for the cart item
     const allImages = getProductImages(product);
 
     for (let i = 0; i < qty; i++) {
       addToCart({
         _id: product._id,
         name: product.name,
-        image: allImages[0] || `https://picsum.photos/seed/${product._id}/300/300`, // ✅ Use primary image from array
+        image: allImages[0] || `https://picsum.photos/seed/${product._id}/300/300`,
         price: product.price,
         discountPrice: product.discountPrice,
         countInStock: product.countInStock,
@@ -76,15 +117,10 @@ export default function ProductDetail() {
     setTimeout(() => setAddedFeedback(false), 2000);
   };
 
-  const currentPrice = product?.discountPrice && product?.discountPrice < product?.price 
-    ? product.discountPrice 
-    : product?.price;
-
   // ✅ Image gallery navigation handlers
   const allImages = product ? getProductImages(product) : [];
   const hasMultipleImages = allImages.length > 1;
   
-  // Fallback if no images exist at all
   const images = allImages.length > 0 
     ? allImages 
     : [`https://picsum.photos/seed/${product?._id || 'default'}/600/600`];
@@ -128,6 +164,8 @@ export default function ProductDetail() {
     );
   }
 
+  const marginData = calcMargin();
+
   return (
     <div className="pd-page">
       {/* Breadcrumb */}
@@ -169,7 +207,6 @@ export default function ProductDetail() {
             
             <img src={images[activeImg]} alt={product.name} />
 
-            {/* ✅ NEW: Image Navigation Arrows & Counter */}
             {hasMultipleImages && (
               <>
                 <button 
@@ -200,7 +237,7 @@ export default function ProductDetail() {
 
           <div className="pd-brand">
             <Icon icon="lucide:store" width={14} />
-            <span>Sold by <strong>MallHub</strong></span>
+            <span>Sold by <strong>{companyName}</strong></span>
           </div>
 
           <div className="pd-rating-row">
@@ -221,22 +258,53 @@ export default function ProductDetail() {
           </div>
 
           <div className="pd-price-block">
-            <span className="pd-price">₦{currentPrice?.toLocaleString()}</span>
+            <span className="pd-price">{currency}{currentPrice?.toLocaleString()}</span>
             {product.discountPrice && product.price && product.discountPrice < product.price && (
               <>
                 <span className="pd-old-price">
-                  ₦{product.price.toLocaleString()}
+                  {currency}{product.price.toLocaleString()}
                 </span>
                 <span className="pd-save-badge">
-                  Save ₦{(product.price - product.discountPrice).toLocaleString()}
+                  Save {currency}{(product.price - product.discountPrice).toLocaleString()}
                 </span>
               </>
             )}
           </div>
 
+          {/* ✅ NEW: Engineering Price & Margin (Admin/Engineer Only) */}
+          {canSeeEngPricing && product.engineeringPrice > 0 && (
+            <div style={{ 
+              background: '#f8f9fa', 
+              border: '1px solid #e9ecef', 
+              borderRadius: '10px', 
+              padding: '12px 16px', 
+              marginTop: '8px',
+              fontSize: '0.85rem',
+              lineHeight: 1.5
+            }}>
+              <div style={{ color: '#495057', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Icon icon="lucide:wrench" width={14} style={{ opacity: 0.6 }} />
+                Eng. Price: {currency}{Number(product.engineeringPrice).toLocaleString()}
+              </div>
+              {marginData && (
+                <div style={{ 
+                  color: marginData.amount >= 0 ? '#2b8a3e' : '#e03131', 
+                  fontWeight: 700,
+                  marginTop: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}>
+                  <Icon icon="lucide:trending-up" width={14} />
+                  Margin: {currency}{marginData.amount.toLocaleString()} ({marginData.pct}%)
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Flash sale bar if discounted */}
           {product.discountPrice && product.price && product.discountPrice < product.price && (
-            <div className="pd-flash-bar">
+            <div className="pd-flash-bar" style={{ marginTop: '12px' }}>
               <span className="pd-flash-bar__label">Flash Deal</span>
               <div className="pd-flash-bar__track">
                 <div
@@ -248,7 +316,7 @@ export default function ProductDetail() {
             </div>
           )}
 
-          {/* Quantity + Add to Cart (Desktop & Mobile Sticky) */}
+          {/* Quantity + Add to Cart */}
           <div className="pd-actions">
             <div className="pd-qty-control">
               <button
@@ -301,7 +369,7 @@ export default function ProductDetail() {
           {getCartQty() > 0 && (
             <Link to="/cart" className="pd-go-cart">
               <Icon icon="lucide:shopping-bag" width={16} />
-              View Cart ({getCartQty()} items) — ₦
+              View Cart ({getCartQty()} items) — {currency}
               {(currentPrice * getCartQty()).toLocaleString()}
             </Link>
           )}
@@ -313,7 +381,7 @@ export default function ProductDetail() {
               <div>
                 <p className="pd-delivery-label">Delivery</p>
                 <p className="pd-delivery-text">
-                  Free delivery on orders over ₦15,000. Otherwise ₦2,500.
+                  Free delivery on orders over {currency}{freeDeliveryThreshold.toLocaleString()}. Otherwise {currency}2,500.
                 </p>
               </div>
             </div>
@@ -322,7 +390,7 @@ export default function ProductDetail() {
               <div>
                 <p className="pd-delivery-label">Returns</p>
                 <p className="pd-delivery-text">
-                  Free return within 30 days if item is defective.
+                  Free return within {returnDays} days if item is defective.
                 </p>
               </div>
             </div>
@@ -347,7 +415,7 @@ export default function ProductDetail() {
         </div>
       </div>
 
-      {/* ✅ NEW: Scoped CSS for Image Gallery Navigation */}
+      {/* ✅ Scoped CSS for Image Gallery Navigation */}
       <style>{`
         .pd-main-img {
           position: relative;

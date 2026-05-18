@@ -91,6 +91,9 @@ export default function Navbar() {
     }
   };
 
+  // ✅ Helper: Check if user can access admin panel
+  const canAccessAdmin = user?.role === "admin" || user?.role === "sales_rep";
+
   return (
     <>
       <style>{`
@@ -1193,7 +1196,10 @@ export default function Navbar() {
                     <Link to="/my-orders" onClick={() => setDropdown(false)} className="nb__dropdown-item"><Icon icon="lucide:package" width={16} /><span>My Orders</span></Link>
                     <Link to="/cart" onClick={() => setDropdown(false)} className="nb__dropdown-item"><Icon icon="lucide:shopping-cart" width={16} /><span>My Cart ({totalQty})</span></Link>
                     <Link to="/rewards" onClick={() => setDropdown(false)} className="nb__dropdown-item"><Icon icon="lucide:coins" width={16} /><span>Coins</span></Link>
-                    {user.role === "admin" && <Link to="/admin/dashboard" onClick={() => setDropdown(false)} className="nb__dropdown-item nb__dropdown-item--admin"><Icon icon="lucide:layout-dashboard" width={16} /><span>Admin Panel</span></Link>}
+                    
+                    {/* ✅ UPDATED: Visible to both Admin and Sales Rep */}
+                    {canAccessAdmin && <Link to="/admin/dashboard" onClick={() => setDropdown(false)} className="nb__dropdown-item nb__dropdown-item--admin"><Icon icon="lucide:layout-dashboard" width={16} /><span>Admin Panel</span></Link>}
+                    
                     <div className="nb__dropdown-divider" />
                     <button onClick={handleLogout} className="nb__dropdown-item nb__dropdown-item--logout"><Icon icon="lucide:log-out" width={16} /><span>Sign Out</span></button>
                   </div>
@@ -1336,7 +1342,8 @@ export default function Navbar() {
   )}
   <Link to="/help" onClick={closeMobile} className="nb__drawer-link"><Icon icon="lucide:help-circle" width={19} /><span>Help Center</span><Icon icon="lucide:chevron-right" width={16} className="nb__drawer-link-arrow" /></Link>
 
-  {user?.role === "admin" && (
+  {/* ✅ UPDATED: Visible to both Admin and Sales Rep */}
+  {canAccessAdmin && (
     <Link to="/admin/dashboard" onClick={closeMobile} className="nb__drawer-link">
       <Icon icon="lucide:layout-dashboard" width={19} />
       <span>Admin Panel</span>
@@ -1363,7 +1370,13 @@ export default function Navbar() {
               <div className="nb__profile-sheet__info">
                 <h3>{user.name}</h3>
                 <p>{user.email}</p>
-                {user.role === "admin" && <span className="nb__profile-sheet__badge"><Icon icon="lucide:shield-check" width={12} />Admin</span>}
+                {/* ✅ UPDATED: Dynamic Badge for Admin or Sales Rep */}
+                {canAccessAdmin && (
+                  <span className="nb__profile-sheet__badge">
+                    <Icon icon={user.role === "admin" ? "lucide:shield-check" : "lucide:briefcase"} width={12} />
+                    {user.role === "admin" ? "Admin" : "Sales Rep"}
+                  </span>
+                )}
               </div>
             </div>
             <div className="nb__profile-sheet__links">
@@ -1372,7 +1385,9 @@ export default function Navbar() {
               <Link to="/my-orders" onClick={() => setProfileSheet(false)}><Icon icon="lucide:package" width={20} /><span>My Orders</span><Icon icon="lucide:chevron-right" width={18} /></Link>
               <Link to="/cart" onClick={() => setProfileSheet(false)}><Icon icon="lucide:shopping-cart" width={20} /><span>My Cart ({totalQty})</span><Icon icon="lucide:chevron-right" width={18} /></Link>
               <Link to="/rewards" onClick={() => setProfileSheet(false)}><Icon icon="lucide:coins" width={20} /><span>Coins (<Point />)</span><Icon icon="lucide:chevron-right" width={18} /></Link>
-              {user.role === "admin" && <Link to="/admin/dashboard" onClick={() => setProfileSheet(false)} className="nb__profile-sheet__admin"><Icon icon="lucide:layout-dashboard" width={20} /><span>Admin Dashboard</span><Icon icon="lucide:chevron-right" width={18} /></Link>}
+              
+              {/* ✅ UPDATED: Visible to both Admin and Sales Rep */}
+              {canAccessAdmin && <Link to="/admin/dashboard" onClick={() => setProfileSheet(false)} className="nb__profile-sheet__admin"><Icon icon="lucide:layout-dashboard" width={20} /><span>Admin Dashboard</span><Icon icon="lucide:chevron-right" width={18} /></Link>}
             </div>
             <button onClick={() => { handleLogout(); setProfileSheet(false); }} className="nb__profile-sheet__logout"><Icon icon="lucide:log-out" width={20} /> Sign Out</button>
           </div>

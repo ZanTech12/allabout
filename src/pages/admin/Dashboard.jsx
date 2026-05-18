@@ -16,7 +16,8 @@ import {
   Shield,
   ClipboardList, 
   MessageSquare,
-  KeyRound // ✅ ADDED for Invite Tokens
+  KeyRound,
+  UserCog // ✅ ADDED for Sales Reps
 } from "lucide-react";
 
 import ProductsPage from "./ProductsPage";
@@ -26,13 +27,17 @@ import UsersPage from "./UsersPage";
 import TrackOrderPage from "./TrackOrder"; 
 import AllOrders from "./AllOrders"; 
 import MessagesPage from "./MessagesPage"; 
-import InviteTokensPage from "./InviteTokensPage"; // ✅ ADDED for Invite Tokens
-// import AppearancePage from "./AppearancePage"; // <-- Uncomment when you create this page
+import InviteTokensPage from "./InviteTokensPage"; 
+import ManageSalesReps from "./ManageSalesReps"; // ✅ ADDED for Sales Reps
+
 import api from "../../api/axios";
+import { useAuth } from "../../context/AuthContext"; // ✅ ADDED for permissions
 import "./Dashboard.css";
 
 export default function AdminDashboard() {
-  const [activePage, setActivePage] = useState("products");
+  const { user, hasPermission } = useAuth(); // ✅ Get permission checker
+  
+  const [activePage, setActivePage] = useState("dashboard"); // Default to dashboard
   const [siteSettings, setSiteSettings] = useState(null);
   const [loading, setLoading] = useState(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -57,18 +62,30 @@ export default function AdminDashboard() {
     }
   };
 
-  // Note: We pass the React component directly (e.g., Box) instead of a string
-  const menuItems = [
-    { key: "products", label: "Products", icon: Box, description: "Manage inventory" },
-    { key: "categories", label: "Categories", icon: Tags, description: "Organize catalog" },
-    { key: "users", label: "Users", icon: Users, description: "Manage accounts" },
-    { key: "invite-tokens", label: "Invite Tokens", icon: KeyRound, description: "Engineer registrations" }, // ✅ ADDED
-    { key: "track-order", label: "Track Order", icon: ChevronRight, description: "Track & update orders" }, 
-    { key: "all-orders", label: "All Orders", icon: ClipboardList, description: "View recent orders" }, 
-    { key: "messages", label: "Messages", icon: MessageSquare, description: "Contact form messages" }, 
-    { key: "appearance", label: "Appearance & Media", icon: Palette, description: "Theme & uploads" },
-    { key: "settings", label: "Site Settings", icon: Settings, description: "Configuration" },
+  // ✅ UPDATED: Added requiredPermission to each menu item, AND a Dashboard item
+  const allMenuItems = [
+    { key: "dashboard", label: "Dashboard", icon: Activity, description: "Overview & Stats", requiredPermission: "dashboard" },
+    { key: "products", label: "Products", icon: Box, description: "Manage inventory", requiredPermission: "manage_products" },
+    { key: "categories", label: "Categories", icon: Tags, description: "Organize catalog", requiredPermission: "manage_categories" },
+    { key: "users", label: "Users", icon: Users, description: "Manage accounts", requiredPermission: "manage_users" },
+    { key: "sales-reps", label: "Sales Reps", icon: UserCog, description: "Manage sales team & access", requiredPermission: "manage_sales_reps" }, 
+    { key: "invite-tokens", label: "Invite Tokens", icon: KeyRound, description: "Engineer registrations", requiredPermission: "manage_engineers" },
+    { key: "track-order", label: "Track Order", icon: ChevronRight, description: "Track & update orders", requiredPermission: "manage_orders" }, 
+    { key: "all-orders", label: "All Orders", icon: ClipboardList, description: "View recent orders", requiredPermission: "manage_orders" }, 
+    { key: "messages", label: "Messages", icon: MessageSquare, description: "Contact form messages", requiredPermission: "manage_banners" }, 
+    { key: "appearance", label: "Appearance & Media", icon: Palette, description: "Theme & uploads", requiredPermission: "manage_settings" },
+    { key: "settings", label: "Site Settings", icon: Settings, description: "Configuration", requiredPermission: "manage_settings" },
   ];
+
+  // ✅ This filters the menu based on the user's permissions array
+  const menuItems = allMenuItems.filter(item => hasPermission(item.requiredPermission));
+
+  // ✅ Safety fallback - if activePage gets removed due to permissions, default to first available page
+  useEffect(() => {
+    if (menuItems.length > 0 && !menuItems.find(item => item.key === activePage)) {
+      setActivePage(menuItems[0].key);
+    }
+  }, [menuItems, activePage]);
 
   const formatTime = (date) => {
     return date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
@@ -136,7 +153,9 @@ export default function AdminDashboard() {
           {!sidebarCollapsed && (
             <div className="dashboard-sidebar-title-group">
               <span className="dashboard-sidebar-title">Admin Panel</span>
-              <span className="dashboard-sidebar-subtitle">Management</span>
+              <span className="dashboard-sidebar-subtitle">
+                {user?.role === 'admin' ? 'Administration' : 'Sales Rep'} {/* ✅ DYNAMIC TITLE */}
+              </span>
             </div>
           )}
         </div>
@@ -283,12 +302,12 @@ export default function AdminDashboard() {
             {/* User Avatar */}
             <div className="dashboard-header-user">
               <div className="dashboard-avatar">
-                <span>A</span>
+                <span>{user?.name?.charAt(0) || 'A'}</span> {/* ✅ Dynamic initial */}
                 <div className="dashboard-avatar-status" />
               </div>
               <div className="dashboard-user-info">
-                <span className="dashboard-user-name">Admin</span>
-                <span className="dashboard-user-role">Super Admin</span>
+                <span className="dashboard-user-name">{user?.name || 'Admin'}</span> {/* ✅ Dynamic name */}
+                <span className="dashboard-user-role" style={{textTransform: 'capitalize'}}>{user?.role?.replace('_', ' ') || 'Admin'}</span> {/* ✅ Dynamic role */}
               </div>
               <ChevronDown
                 width={14}
@@ -300,10 +319,18 @@ export default function AdminDashboard() {
 
         {/* Page Content */}
         <div className="dashboard-content">
+          {/* ✅ ADDED: Dashboard Landing Page Placeholder */}
+          {activePage === "dashboard" && (
+            <div className="dashboard-placeholder-page">
+              <h2>Welcome back, {user?.name || 'Admin'}!</h2>
+              <p>Select an option from the sidebar to get started.</p>
+            </div>
+          )}
           {activePage === "products" && <ProductsPage />}
           {activePage === "categories" && <CategoriesPage />}
           {activePage === "users" && <UsersPage />}
-          {activePage === "invite-tokens" && <InviteTokensPage />} {/* ✅ ADDED */}
+          {activePage === "sales-reps" && <ManageSalesReps />} {/* ✅ ADDED */}
+          {activePage === "invite-tokens" && <InviteTokensPage />}
           {activePage === "track-order" && <TrackOrderPage />} 
           {activePage === "all-orders" && <AllOrders />} 
           {activePage === "messages" && <MessagesPage />} 
@@ -311,7 +338,6 @@ export default function AdminDashboard() {
             <div className="dashboard-placeholder-page">
               <h2>Appearance & Media</h2>
               <p>Theme and media upload settings will go here.</p>
-              {/* Replace this div with <AppearancePage /> when ready */}
             </div>
           )}
           {activePage === "settings" && (

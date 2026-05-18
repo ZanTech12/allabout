@@ -106,6 +106,7 @@ export default function Cart() {
     };
   });
 
+  // ✅ Role-based Subtotal and Totals
   const safeSubtotal = validatedCart.reduce((sum, item) => {
     return sum + (getEffectivePrice(item, canSeeEngPricing) * (Number(item.quantity) || 1));
   }, 0);
@@ -122,6 +123,13 @@ export default function Cart() {
   const deliveryFee = safeSubtotal > 15000 ? 0 : 2500;
   const grandTotal = safeSubtotal + deliveryFee;
 
+  // ✅ Explicit Label for Pricing Tier based on Role
+  const pricingTierLabel = canSeeEngPricing && validatedCart.some(i => Number(i.engineeringPrice) > 0 && Number(i.engineeringPrice) < Number(i.price))
+    ? "Engineer Pricing"
+    : totalSavings > 0
+    ? "Discounted Pricing"
+    : "Standard Pricing";
+
   // ✅ Coin calculations
   const maxApplicableCoins = Math.min(userCoins, Math.floor(grandTotal / 100));
   const canPayFullyWithCoins = userCoins * 100 >= grandTotal;
@@ -134,7 +142,22 @@ export default function Cart() {
 
   const coinDiscount = coinsToUse * 100;
   const amountToPay = grandTotal - coinDiscount;
-  const coinsEarned = Math.floor(amountToPay / 10000);
+
+  // ✅ Coin Eligibility Calculation (Eng prices < ₦10k earn no coins)
+  let eligibleAmountForCoins = 0;
+  validatedCart.forEach(item => {
+    const effectivePrice = getEffectivePrice(item, canSeeEngPricing);
+    const safeQuantity = Number(item.quantity) || 1;
+    const isEngPrice = canSeeEngPricing && Number(item.engineeringPrice) > 0;
+    
+    if (isEngPrice && Number(item.engineeringPrice) < 10000) {
+      return; 
+    }
+    
+    eligibleAmountForCoins += effectivePrice * safeQuantity;
+  });
+
+  const coinsEarned = Math.floor(Math.max(0, eligibleAmountForCoins + deliveryFee - coinDiscount) / 10000);
 
   const getProductId = (item) => item.product?._id || item.product;
 
@@ -147,7 +170,7 @@ export default function Cart() {
       message += `   Qty: ${safeQuantity}  •  Price: ₦${(effectivePrice * safeQuantity).toLocaleString()}\n\n`;
     });
     message += "____________________\n\n";
-    message += `*Subtotal:* ₦${safeSubtotal.toLocaleString()}\n`;
+    message += `*Subtotal (${pricingTierLabel}):* ₦${safeSubtotal.toLocaleString()}\n`;
     message += `*Delivery Fee:* ${deliveryFee === 0 ? "FREE" : "₦2,500"}\n`;
     if (coinDiscount > 0) {
       message += `*Coin Discount:* -₦${coinDiscount.toLocaleString()} (${coinsToUse} coins)\n`;
@@ -177,8 +200,8 @@ export default function Cart() {
       product: getProductId(item),
       name: item.name,
       image: item.image,
-      price: getEffectivePrice(item, canSeeEngPricing),
-      originalPrice: Number(item.price) || 0,
+      price: getEffectivePrice(item, canSeeEngPricing), // The price they actually pay
+      originalPrice: Number(item.price) || 0,           // The standard list price
       engineeringPrice: Number(item.engineeringPrice) || undefined,
       quantity: Number(item.quantity) || 1,
     })),
@@ -201,7 +224,6 @@ export default function Cart() {
     setPlacing(true);
     setError("");
     try {
-      // Use all applicable coins for full payment
       const fullCoinsNeeded = Math.ceil(grandTotal / 100);
       const coinsForPayment = Math.min(userCoins, fullCoinsNeeded);
 
@@ -343,10 +365,6 @@ export default function Cart() {
     );
   }
 
-  const savingsLabel = canSeeEngPricing && validatedCart.some(i => Number(i.engineeringPrice) > 0 && Number(i.engineeringPrice) < Number(i.price))
-    ? "engineer pricing"
-    : "discounted prices";
-
   // ✅ Calculate coins needed for full payment
   const coinsNeededForFullPayment = Math.ceil(grandTotal / 100);
 
@@ -428,7 +446,7 @@ export default function Cart() {
             <div style={{ display: 'flex', alignItems: 'center', backgroundColor: '#d4edda', padding: '12px', borderRadius: '8px', marginBottom: '10px', marginTop: '10px' }}>
               <Icon icon="lucide:tag" width={16} style={{ color: '#155724' }} />
               <span style={{ marginLeft: '8px', color: '#155724', fontSize: '13px', fontWeight: '600' }}>
-                You're saving ₦{totalSavings.toLocaleString()} with {savingsLabel}!
+                You're saving ₦{totalSavings.toLocaleString()} with {pricingTierLabel}!
               </span>
             </div>
           )}
@@ -586,7 +604,7 @@ export default function Cart() {
               }}>
                 <Icon icon="lucide:coins" width={16} color="#9ca3af" />
                 <span style={{ fontSize: '12px', color: '#6b7280' }}>
-                  You have no loyalty coins yet. Earn 1 coin for every ₦10,000 spent!
+                  You have no loyalty coins yet. Earn 1 coin for every ₦10,000 spent!{canSeeEngPricing ? " (Eng. prices < ₦10k excluded)" : ""}
                 </span>
               </div>
             )}
@@ -616,7 +634,8 @@ export default function Cart() {
             </div>
 
             <div className="cart-summary-row">
-              <span>Subtotal ({totalQty} items)</span>
+              {/* ✅ Explicitly show which pricing tier is applied to the subtotal */}
+              <span>Subtotal ({totalQty} items) <small style={{ fontWeight: 400, color: '#6b7280', display: 'block', marginTop: '2px' }}>{pricingTierLabel}</small></span>
               <span>₦{safeSubtotal.toLocaleString()}</span>
             </div>
 

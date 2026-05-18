@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
-import { ProtectedRoute, AdminRoute } from './components/ProtectedRoute';
+import { ProtectedRoute } from './components/ProtectedRoute'; // ✅ Updated import
 import { Icon } from '@iconify/react';
 import Navbar from './components/Navbar';
 import Home from './pages/Home';
@@ -11,7 +11,8 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Cart from './pages/Cart';
 import AdminDashboard from './pages/admin/Dashboard';
-import MessagesPage from './pages/admin/MessagesPage'; // ✅ Updated to import MessagesPage
+import MessagesPage from './pages/admin/MessagesPage';
+import ManageSalesReps from './pages/admin/ManageSalesReps'; // ✅ NEW: Import Sales Reps Page
 import ProductDetail from "./pages/ProductDetail";
 import TrackOrder from "./pages/TrackOrder";
 import MyOrdersPage from "./pages/MyOrdersPage";
@@ -20,6 +21,9 @@ import RegisterEngineer from "./pages/RegisterEngineer";
 import ScrollToTop from './ScrollToTop';
 import api from './api/axios';
 import './App.css';
+
+// ⚠️ NOTE: If you have other admin pages like ProductsPage, OrdersPage, etc., 
+// import them here as well.
 
 function App() {
   const [siteSettings, setSiteSettings] = useState(null);
@@ -66,18 +70,46 @@ function App() {
             <Navbar />
             <main className="app-main">
               <Routes>
+                {/* ─── Public Routes ─── */}
                 <Route path="/" element={<Home />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
                 <Route path="/cart" element={<Cart />} />
                 <Route path="/product/:id" element={<ProductDetail />} />
-                <Route path="/admin/dashboard" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
-                <Route path="/admin/messages" element={<AdminRoute><MessagesPage /></AdminRoute>} /> {/* ✅ Updated Route to use MessagesPage */}
-                
                 <Route path="/track-order" element={<TrackOrder />} />
-                <Route path="/my-orders" element={<ProtectedRoute><MyOrdersPage /></ProtectedRoute>} />
                 <Route path="/rewards" element={<Rewards/>} /> 
                 <Route path="/register-engineer" element={<RegisterEngineer />} />
+
+                {/* ─── General Protected Routes ─── */}
+                <Route path="/my-orders" element={<ProtectedRoute><MyOrdersPage /></ProtectedRoute>} />
+
+                {/* ══════════════════════════════════════════════════════════════
+                    ✅ UPDATED: Admin / Sales Rep Routes (Permission Protected)
+                    Admin always passes. Sales Rep must have the specific permission.
+                ══════════════════════════════════════════════════════════════ */}
+                <Route 
+                  path="/admin/dashboard" 
+                  element={<ProtectedRoute requiredPermission="dashboard"><AdminDashboard /></ProtectedRoute>} 
+                />
+                <Route 
+                  path="/admin/messages" 
+                  element={<ProtectedRoute requiredPermission="manage_banners"><MessagesPage /></ProtectedRoute>} 
+                />
+                
+                {/* ✅ NEW: Sales Rep Management (Admin Only Permission) */}
+                <Route 
+                  path="/admin/sales-reps" 
+                  element={<ProtectedRoute requiredPermission="manage_sales_reps"><ManageSalesReps /></ProtectedRoute>} 
+                />
+
+                {/* ⚠️ EXAMPLES: Add your other admin routes following this pattern: */}
+                {/*
+                <Route path="/admin/products" element={<ProtectedRoute requiredPermission="manage_products"><ProductsPage /></ProtectedRoute>} />
+                <Route path="/admin/categories" element={<ProtectedRoute requiredPermission="manage_categories"><CategoriesPage /></ProtectedRoute>} />
+                <Route path="/admin/orders" element={<ProtectedRoute requiredPermission="manage_orders"><OrdersPage /></ProtectedRoute>} />
+                <Route path="/admin/users" element={<ProtectedRoute requiredPermission="manage_users"><UsersPage /></ProtectedRoute>} />
+                <Route path="/admin/settings" element={<ProtectedRoute requiredPermission="manage_settings"><SettingsPage /></ProtectedRoute>} />
+                */}
               </Routes>
             </main>
 
