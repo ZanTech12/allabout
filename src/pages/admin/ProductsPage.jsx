@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Icon } from "@iconify/react";
 import api from "../../api/axios";
-import { useAuth } from "../../context/AuthContext"; // ✅ NEW
+import { useAuth } from "../../context/AuthContext";
 import Modal from "./Modal";
 import DeleteConfirm from "./DeleteConfirm";
 import Toast from "./Toast";
@@ -34,11 +34,11 @@ const EMPTY_FORM = {
   isFeatured: false,
   isNewArrival: false,
   isFlashSale: false,
-  assignedSalesRep: "", // ✅ NEW
+  assignedSalesRep: "",
 };
 
 export default function ProductsPage() {
-  const { user } = useAuth(); // ✅ NEW: Current logged-in user
+  const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const isMobile = useIsMobile();
   const fileInputRef = useRef(null);
@@ -46,29 +46,31 @@ export default function ProductsPage() {
   /* ── Role helpers ── */
   const isAdminOrEngineer =
     user?.role === "admin" || user?.role === "engineer";
-  const isSalesRep =
-    user?.role === "sales_rep" || user?.role === "salesRep";
+  const isSalesRep = user?.role === "sales_rep";
 
-  // ✅ Can this user see/edit engineering price for a specific product?
-  const canEditEngPrice = (product) => {
+  // ✅ Can this user edit ALL prices (Selling, Discount, Eng) for a specific product?
+  // Admins and Sales Reps can edit any product's prices.
+  const canEditProductPrices = (product) => {
     if (!user) return false;
-    if (isAdminOrEngineer) return true;
-    if (isSalesRep) {
-      const assignedId =
-        product?.assignedSalesRep?._id?.toString() ||
-        (typeof product?.assignedSalesRep === "string"
-          ? product.assignedSalesRep.toString()
-          : null);
-      return assignedId && assignedId === user._id.toString();
-    }
+    if (isAdminOrEngineer || isSalesRep) return true;
     return false;
   };
 
-  // ✅ Should the engineering price field appear in the form?
-  //    Admin/Engineer: always. Sales rep: only when editing an assigned product.
-  const showEngPriceField =
-    isAdminOrEngineer ||
-    (isSalesRep && !!editingProduct && canEditEngPrice(editingProduct));
+  /* ── Price Parsing & Formatting Helpers ── */
+  // Strips commas and fixes JavaScript floating-point precision issues
+  const parsePrice = (val) => {
+    if (val === "" || val === null || val === undefined) return 0;
+    const cleanVal = String(val).replace(/,/g, ""); // Remove commas in case user types "17,500"
+    const num = parseFloat(cleanVal);
+    if (isNaN(num)) return 0;
+    return Math.round(num * 100) / 100; // Round to 2 decimal places
+  };
+
+  // Consistently formats numbers as currency with 2 decimal places
+  const formatCurrency = (amount) => {
+    const num = Number(amount) || 0;
+    return num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
 
   /* ── Read filter params from URL ── */
   const filterCategory = searchParams.get("category") || "";
@@ -140,7 +142,7 @@ export default function ProductsPage() {
   /* ── Existing state ── */
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [salesReps, setSalesReps] = useState([]); // ✅ NEW: List of sales reps for dropdown
+  const [salesReps, setSalesReps] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -154,14 +156,14 @@ export default function ProductsPage() {
 
   useEffect(() => {
     fetchData();
-    fetchSalesReps(); // ✅ NEW
+    fetchSalesReps();
   }, []);
 
   const fetchData = async () => {
     setLoading(true);
     try {
       const [prodRes, catRes] = await Promise.all([
-        api.get("/products/admin/all"), // ✅ CHANGED: Use admin endpoint to get engineeringPrice + assignedSalesRep
+        api.get("/products/admin/all"),
         api.get("/categories"),
       ]);
       setProducts(prodRes.data);
@@ -173,19 +175,15 @@ export default function ProductsPage() {
     }
   };
 
-  // ✅ NEW: Fetch sales reps for the assignment dropdown (admin/engineer only)
   const fetchSalesReps = async () => {
-    if (!isAdminOrEngineer) return;
+    if (!isAdminOrEngineer && !isSalesRep) return;
     try {
-      const res = await api.get("/users", { params: { role: "salesRep" } });
+      const res = await api.get("/users", { params: { role: "sales_rep" } });
       const users = res.data.users || res.data || [];
-      const reps = users.filter(
-        (u) => u.role === "salesRep" || u.role === "sales_rep"
-      );
+      const reps = users.filter((u) => u.role === "sales_rep");
       setSalesReps(reps);
     } catch (error) {
       console.error("Failed to fetch sales reps:", error);
-      // Non-critical — dropdown will just be empty
     }
   };
 
@@ -294,7 +292,7 @@ export default function ProductsPage() {
     if (typeof product.assignedSalesRep === "object") {
       return product.assignedSalesRep.name || product.assignedSalesRep.email;
     }
-    return null; // Just an ID — can't display a name
+    return null;
   };
 
   /* ── Helper: is this product assigned to the current sales rep? ── */
@@ -318,7 +316,6 @@ export default function ProductsPage() {
       images = [""];
     }
 
-    // ✅ Extract assignedSalesRep ID (may be populated object or raw ID)
     const assignedRepId = product.assignedSalesRep
       ? product.assignedSalesRep._id?.toString() ||
         (typeof product.assignedSalesRep === "string"
@@ -340,7 +337,7 @@ export default function ProductsPage() {
       isFeatured: parseBool(product.isFeatured),
       isNewArrival: parseBool(product.isNewArrival),
       isFlashSale: parseBool(product.isFlashSale),
-      assignedSalesRep: assignedRepId, // ✅ NEW
+      assignedSalesRep: assignedRepId,
     });
     setEditingProduct(product);
     setShowForm(true);
@@ -356,13 +353,9 @@ export default function ProductsPage() {
         ...form,
         image: cleanedImages[0] || "",
         images: cleanedImages,
-        price: parseFloat(form.price) || 0,
-        discountPrice: form.discountPrice
-          ? parseFloat(form.discountPrice)
-          : null,
-        engineeringPrice: form.engineeringPrice
-          ? parseFloat(form.engineeringPrice)
-          : null,
+        price: parsePrice(form.price),
+        discountPrice: form.discountPrice ? parsePrice(form.discountPrice) : null,
+        engineeringPrice: form.engineeringPrice ? parsePrice(form.engineeringPrice) : null,
         countInStock: parseInt(form.countInStock) || 0,
         isFeatured: Boolean(form.isFeatured),
         isNewArrival: Boolean(form.isNewArrival),
@@ -370,15 +363,15 @@ export default function ProductsPage() {
       };
       delete payload.image;
 
-      // ✅ Only admin/engineer can set assignedSalesRep via this route
-      if (isAdminOrEngineer) {
+      if (isAdminOrEngineer || isSalesRep) {
         payload.assignedSalesRep = form.assignedSalesRep || null;
       } else {
         delete payload.assignedSalesRep;
       }
 
-      // ✅ Sales rep who is NOT assigned should not send engineeringPrice
-      if (!canEditEngPrice(editingProduct)) {
+      if (!canEditProductPrices(editingProduct)) {
+        delete payload.price;
+        delete payload.discountPrice;
         delete payload.engineeringPrice;
       }
 
@@ -467,18 +460,14 @@ export default function ProductsPage() {
     products.filter((p) => parseBool(p[flag])).length;
 
   const formatEngPrice = (p) => {
-    // ✅ Only show engineering price if user is allowed to see it
-    if (!canEditEngPrice(p)) return null;
+    if (!canEditProductPrices(p)) return null;
     if (p.engineeringPrice && p.engineeringPrice > 0) {
-      return `₦${Number(p.engineeringPrice).toLocaleString()}`;
+      return `₦${formatCurrency(p.engineeringPrice)}`;
     }
     return null;
   };
 
-  // ✅ Recompute showEngPriceField whenever editingProduct changes
-  const currentShowEngPriceField =
-    isAdminOrEngineer ||
-    (isSalesRep && !!editingProduct && canEditEngPrice(editingProduct));
+  const currentShowEngPriceField = isAdminOrEngineer || isSalesRep;
 
   if (loading) {
     return (
@@ -562,15 +551,18 @@ export default function ProductsPage() {
             )}
           </p>
         </div>
-        <button
-          onClick={() => {
-            resetForm();
-            setShowForm(true);
-          }}
-          className={`prod-add-btn ${isMobile ? "w-100 justify-content-center" : ""}`}
-        >
-          <Icon icon="lucide:plus" width={18} /> Add Product
-        </button>
+        
+        {(isAdminOrEngineer || isSalesRep) && (
+          <button
+            onClick={() => {
+              resetForm();
+              setShowForm(true);
+            }}
+            className={`prod-add-btn ${isMobile ? "w-100 justify-content-center" : ""}`}
+          >
+            <Icon icon="lucide:plus" width={18} /> Add Product
+          </button>
+        )}
       </div>
 
       <div className="prod-search">
@@ -662,8 +654,7 @@ export default function ProductsPage() {
               />
             </div>
 
-            {/* ✅ NEW: Assigned Sales Rep — only visible to Admin/Engineer */}
-            {isAdminOrEngineer && (
+            {(isAdminOrEngineer || isSalesRep) && (
               <div className="col-12 col-sm-6">
                 <label className="prod-form__label">
                   Assigned Sales Rep{" "}
@@ -671,7 +662,7 @@ export default function ProductsPage() {
                     className="text-muted fw-normal"
                     style={{ fontSize: "0.78rem" }}
                   >
-                    (Can edit eng. price)
+                    (Can edit prices)
                   </span>
                 </label>
                 <select
@@ -692,7 +683,6 @@ export default function ProductsPage() {
               </div>
             )}
 
-            {/* ✅ Sales Rep badge when editing an assigned product */}
             {isSalesRep && editingProduct && isAssignedToMe(editingProduct) && (
               <div className="col-12 col-sm-6 d-flex align-items-end">
                 <div
@@ -708,8 +698,7 @@ export default function ProductsPage() {
                   }}
                 >
                   <Icon icon="lucide:user-check" width={16} />
-                  You are assigned to this product — you can set the
-                  engineering price
+                  You are assigned to this product
                 </div>
               </div>
             )}
@@ -725,6 +714,7 @@ export default function ProductsPage() {
                 onChange={(e) => setForm({ ...form, price: e.target.value })}
                 className="form-control prod-form__input"
                 placeholder="0.00"
+                disabled={!canEditProductPrices(editingProduct)} 
               />
             </div>
             <div className="col-12 col-sm-6">
@@ -739,10 +729,10 @@ export default function ProductsPage() {
                 }
                 className="form-control prod-form__input"
                 placeholder="Leave empty if none"
+                disabled={!canEditProductPrices(editingProduct)}
               />
             </div>
 
-            {/* ✅ Engineering Price — visible to Admin/Engineer always, Sales Rep only if assigned */}
             {currentShowEngPriceField && (
               <div className="col-12 col-sm-6">
                 <label className="prod-form__label">
@@ -768,7 +758,6 @@ export default function ProductsPage() {
               </div>
             )}
 
-            {/* ✅ Margin auto-calculation — only when eng price field is visible */}
             {currentShowEngPriceField && (
               <div className="col-12 col-sm-6">
                 <label className="prod-form__label">
@@ -802,18 +791,18 @@ export default function ProductsPage() {
                 >
                   {form.engineeringPrice && form.price
                     ? (() => {
-                        const eng = parseFloat(form.engineeringPrice) || 0;
-                        const sell = parseFloat(form.price) || 0;
+                        const eng = parsePrice(form.engineeringPrice);
+                        const sell = parsePrice(form.price);
                         const effectiveSell = form.discountPrice
-                          ? parseFloat(form.discountPrice)
+                          ? parsePrice(form.discountPrice)
                           : sell;
                         if (eng > 0 && effectiveSell > 0) {
-                          const marginAmt = effectiveSell - eng;
+                          const marginAmt = Math.round((effectiveSell - eng) * 100) / 100;
                           const marginPct = (
                             (marginAmt / effectiveSell) *
                             100
                           ).toFixed(1);
-                          return `₦${marginAmt.toLocaleString()} (${marginPct}%)`;
+                          return `₦${formatCurrency(marginAmt)} (${marginPct}%)`;
                         }
                         return "—";
                       })()
@@ -851,7 +840,6 @@ export default function ProductsPage() {
               />
             </div>
 
-            {/* ── Multiple Image URLs + Upload ── */}
             <div className="col-12">
               <div className="d-flex align-items-center justify-content-between mb-2">
                 <label className="prod-form__label mb-0">
@@ -1131,15 +1119,14 @@ export default function ProductsPage() {
               </p>
               <div className="d-flex align-items-baseline gap-2 mb-1">
                 <span className="prod-mobile-card__price-current">
-                  ₦{(p.discountPrice || p.price)?.toLocaleString()}
+                  ₦{formatCurrency(p.discountPrice || p.price)}
                 </span>
                 {p.discountPrice && (
                   <span className="prod-mobile-card__price-old">
-                    ₦{p.price?.toLocaleString()}
+                    ₦{formatCurrency(p.price)}
                   </span>
                 )}
               </div>
-              {/* ✅ Engineering price — only shown if user can see it */}
               {formatEngPrice(p) && (
                 <div className="d-flex align-items-center gap-1 mb-1">
                   <Icon
@@ -1154,7 +1141,6 @@ export default function ProductsPage() {
                   </span>
                 </div>
               )}
-              {/* ✅ NEW: Assigned rep indicator */}
               {getAssignedRepName(p) && (
                 <div className="d-flex align-items-center gap-1 mb-1">
                   <Icon
@@ -1192,7 +1178,6 @@ export default function ProductsPage() {
                     ⚡ Sale
                   </span>
                 )}
-                {/* ✅ NEW: "You" badge for assigned sales rep */}
                 {isAssignedToMe(p) && (
                   <span
                     className="prod-badge"
@@ -1223,19 +1208,21 @@ export default function ProductsPage() {
                   />
                   Edit
                 </button>
-                <button
-                  onClick={() =>
-                    setDeleteConfirm({ id: p._id, name: p.name })
-                  }
-                  className="btn prod-mobile-card__btn prod-mobile-card__btn--delete flex-grow-1"
-                >
-                  <Icon
-                    icon="lucide:trash-2"
-                    width={14}
-                    className="me-1"
-                  />
-                  Delete
-                </button>
+                {(isAdminOrEngineer || isSalesRep) && (
+                  <button
+                    onClick={() =>
+                      setDeleteConfirm({ id: p._id, name: p.name })
+                    }
+                    className="btn prod-mobile-card__btn prod-mobile-card__btn--delete flex-grow-1"
+                  >
+                    <Icon
+                      icon="lucide:trash-2"
+                      width={14}
+                      className="me-1"
+                    />
+                    Delete
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -1278,16 +1265,13 @@ export default function ProductsPage() {
               <th>Product</th>
               <th>Category</th>
               <th>Selling Price</th>
-              {/* ✅ Eng. Price & Margin only shown to users who can see them on at least some products */}
-              {(isAdminOrEngineer ||
-                products.some((p) => canEditEngPrice(p))) && (
+              {(isAdminOrEngineer || isSalesRep) && (
                 <>
                   <th>Eng. Price</th>
                   <th>Margin</th>
                 </>
               )}
               <th>Stock</th>
-              {/* ✅ NEW: Assigned To column */}
               <th>Assigned To</th>
               <th>Display On</th>
               <th className="text-end">Actions</th>
@@ -1295,7 +1279,7 @@ export default function ProductsPage() {
           </thead>
           <tbody>
             {filteredProducts.map((p) => {
-              const canSeeEng = canEditEngPrice(p);
+              const canSeeEng = canEditProductPrices(p);
               const engPrice =
                 canSeeEng && p.engineeringPrice
                   ? Number(p.engineeringPrice)
@@ -1303,8 +1287,9 @@ export default function ProductsPage() {
               const sellPrice = p.discountPrice
                 ? Number(p.discountPrice)
                 : Number(p.price) || 0;
+              // Fix for floating point inaccuracies on table margin calculation as well
               const marginAmt =
-                engPrice > 0 && sellPrice > 0 ? sellPrice - engPrice : null;
+                engPrice > 0 && sellPrice > 0 ? Math.round((sellPrice - engPrice) * 100) / 100 : null;
               const marginPct =
                 marginAmt !== null && sellPrice > 0
                   ? ((marginAmt / sellPrice) * 100).toFixed(1)
@@ -1337,18 +1322,15 @@ export default function ProductsPage() {
                   <td className="prod-table__cell">{p.category}</td>
                   <td className="prod-table__cell">
                     <span className="prod-table__price-current d-block">
-                      ₦
-                      {(p.discountPrice || p.price)?.toLocaleString()}
+                      ₦{formatCurrency(p.discountPrice || p.price)}
                     </span>
                     {p.discountPrice && (
                       <span className="prod-table__price-old d-block">
-                        ₦{p.price?.toLocaleString()}
+                        ₦{formatCurrency(p.price)}
                       </span>
                     )}
                   </td>
-                  {/* ✅ Eng. Price & Margin — conditional per row */}
-                  {(isAdminOrEngineer ||
-                    products.some((pp) => canEditEngPrice(pp))) && (
+                  {(isAdminOrEngineer || isSalesRep) && (
                     <>
                       <td className="prod-table__cell">
                         {canSeeEng && formatEngPrice(p) ? (
@@ -1382,7 +1364,7 @@ export default function ProductsPage() {
                                 marginAmt >= 0 ? "#2b8a3e" : "#e03131",
                             }}
                           >
-                            ₦{marginAmt.toLocaleString()}
+                            ₦{formatCurrency(marginAmt)}
                             <span
                               style={{
                                 fontWeight: 400,
@@ -1421,7 +1403,6 @@ export default function ProductsPage() {
                       {p.countInStock}
                     </span>
                   </td>
-                  {/* ✅ NEW: Assigned To column */}
                   <td className="prod-table__cell">
                     {isAssignedToMe(p) ? (
                       <span
@@ -1498,18 +1479,20 @@ export default function ProductsPage() {
                       >
                         <Icon icon="lucide:pencil" width={16} />
                       </button>
-                      <button
-                        onClick={() =>
-                          setDeleteConfirm({
-                            id: p._id,
-                            name: p.name,
-                          })
-                        }
-                        className="prod-table__action-btn prod-table__action-btn--delete"
-                        title="Delete"
-                      >
-                        <Icon icon="lucide:trash-2" width={16} />
-                      </button>
+                      {(isAdminOrEngineer || isSalesRep) && (
+                        <button
+                          onClick={() =>
+                            setDeleteConfirm({
+                              id: p._id,
+                              name: p.name,
+                            })
+                          }
+                          className="prod-table__action-btn prod-table__action-btn--delete"
+                          title="Delete"
+                        >
+                          <Icon icon="lucide:trash-2" width={16} />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
