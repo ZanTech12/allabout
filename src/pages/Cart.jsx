@@ -44,6 +44,11 @@ export default function Cart() {
   const [error, setError] = useState("");
   const [showMobileForm, setShowMobileForm] = useState(false);
 
+  // ✅ Delivery settings from SiteSettings
+  const [deliverySettings, setDeliverySettings] = useState({
+    deliveryFee: 2500,
+  });
+
   // ✅ Coin states
   const [userCoins, setUserCoins] = useState(0);
   const [useCoins, setUseCoins] = useState(false);
@@ -57,6 +62,23 @@ export default function Cart() {
   const handleShippingChange = (e) => {
     setShippingInfo({ ...shippingInfo, [e.target.name]: e.target.value });
   };
+
+  // ✅ Fetch site settings for delivery config
+  useEffect(() => {
+    const fetchDeliverySettings = async () => {
+      try {
+        const { data } = await api.get('/settings');
+        if (data?.delivery) {
+          setDeliverySettings({
+            deliveryFee: Number(data.delivery.deliveryFee) || 2500,
+          });
+        }
+      } catch (err) {
+        console.error('Failed to fetch delivery settings, using defaults:', err);
+      }
+    };
+    fetchDeliverySettings();
+  }, []);
 
   // ✅ Fetch user coin balance
   useEffect(() => {
@@ -120,8 +142,12 @@ export default function Cart() {
     return sum;
   }, 0);
 
-  const deliveryFee = safeSubtotal > 15000 ? 0 : 2500;
-  const grandTotal = safeSubtotal + deliveryFee;
+  // ✅ DYNAMIC: Delivery fee from settings (kept for backend payload reference)
+  const { deliveryFee: configuredDeliveryFee } = deliverySettings;
+  const deliveryFee = configuredDeliveryFee;
+
+  // ✅ Grand Total no longer includes delivery fee
+  const grandTotal = safeSubtotal;
 
   // ✅ Explicit Label for Pricing Tier based on Role
   const pricingTierLabel = canSeeEngPricing && validatedCart.some(i => Number(i.engineeringPrice) > 0 && Number(i.engineeringPrice) < Number(i.price))
@@ -157,7 +183,8 @@ export default function Cart() {
     eligibleAmountForCoins += effectivePrice * safeQuantity;
   });
 
-  const coinsEarned = Math.floor(Math.max(0, eligibleAmountForCoins + deliveryFee - coinDiscount) / 10000);
+  // ✅ Removed deliveryFee from coins earned calculation
+  const coinsEarned = Math.floor(Math.max(0, eligibleAmountForCoins - coinDiscount) / 10000);
 
   const getProductId = (item) => item.product?._id || item.product;
 
@@ -171,7 +198,6 @@ export default function Cart() {
     });
     message += "____________________\n\n";
     message += `*Subtotal (${pricingTierLabel}):* ₦${safeSubtotal.toLocaleString()}\n`;
-    message += `*Delivery Fee:* ${deliveryFee === 0 ? "FREE" : "₦2,500"}\n`;
     if (coinDiscount > 0) {
       message += `*Coin Discount:* -₦${coinDiscount.toLocaleString()} (${coinsToUse} coins)\n`;
     }
@@ -200,13 +226,13 @@ export default function Cart() {
       product: getProductId(item),
       name: item.name,
       image: item.image,
-      price: getEffectivePrice(item, canSeeEngPricing), // The price they actually pay
-      originalPrice: Number(item.price) || 0,           // The standard list price
+      price: getEffectivePrice(item, canSeeEngPricing),
+      originalPrice: Number(item.price) || 0,
       engineeringPrice: Number(item.engineeringPrice) || undefined,
       quantity: Number(item.quantity) || 1,
     })),
     subtotal: safeSubtotal,
-    deliveryFee,
+    deliveryFee, // Sent to backend for reference, but not charged to user
     total: grandTotal,
     coinsUsed: coinsToUse,
     coinDiscount: coinDiscount,
@@ -238,7 +264,7 @@ export default function Cart() {
           quantity: Number(item.quantity) || 1,
         })),
         subtotal: safeSubtotal,
-        deliveryFee,
+        deliveryFee, // Sent to backend for reference
         total: grandTotal,
         coinsUsed: coinsForPayment,
         coinDiscount: coinsForPayment * 100,
@@ -365,7 +391,6 @@ export default function Cart() {
     );
   }
 
-  // ✅ Calculate coins needed for full payment
   const coinsNeededForFullPayment = Math.ceil(grandTotal / 100);
 
   return (
@@ -382,10 +407,6 @@ export default function Cart() {
         <div className="cart-items-section">
           <div className="cart-header">
             <h2>Shopping Cart ({totalQty})</h2>
-            <span className="cart-delivery-text">
-              <Icon icon="lucide:truck" width={16} />
-              Free delivery over ₦15k
-            </span>
           </div>
 
           <Point />
@@ -532,7 +553,6 @@ export default function Cart() {
                       <span>{maxApplicableCoins} max</span>
                     </div>
 
-                    {/* ✅ Quick action buttons for coin slider */}
                     <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
                       <button
                         onClick={() => setCoinsToUse(0)}
@@ -565,7 +585,6 @@ export default function Cart() {
                   </div>
                 )}
 
-                {/* ✅ "Buy Fully with Coins" CTA when user has enough */}
                 {canPayFullyWithCoins && !useCoins && (
                   <div style={{
                     marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #fde68a',
@@ -595,7 +614,6 @@ export default function Cart() {
               </div>
             )}
 
-            {/* ✅ Show coin info even when user has 0 coins */}
             {userCoins === 0 && user && (
               <div style={{
                 background: '#f9fafb', border: '1px solid #e5e7eb',
@@ -634,7 +652,6 @@ export default function Cart() {
             </div>
 
             <div className="cart-summary-row">
-              {/* ✅ Explicitly show which pricing tier is applied to the subtotal */}
               <span>Subtotal ({totalQty} items) <small style={{ fontWeight: 400, color: '#6b7280', display: 'block', marginTop: '2px' }}>{pricingTierLabel}</small></span>
               <span>₦{safeSubtotal.toLocaleString()}</span>
             </div>
@@ -645,13 +662,6 @@ export default function Cart() {
                 <span>-₦{totalSavings.toLocaleString()}</span>
               </div>
             )}
-
-            <div className="cart-summary-row">
-              <span>Delivery Fee</span>
-              <span className={safeSubtotal > 15000 ? 'text-green' : ''}>
-                {safeSubtotal > 15000 ? 'FREE' : '₦2,500'}
-              </span>
-            </div>
 
             {coinsToUse > 0 && (
               <div className="cart-summary-row" style={{ color: '#d97706', fontWeight: 600 }}>
