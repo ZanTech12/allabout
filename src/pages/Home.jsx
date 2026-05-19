@@ -321,6 +321,7 @@ export default function Home() {
   const [timeLeft, setTimeLeft] = useState({ h: 8, m: 45, s: 12 });
   const [activeCat, setActiveCat] = useState("");
   const [productCategories, setProductCategories] = useState({});
+  const [showAuthPopup, setShowAuthPopup] = useState(false);
 
   const { addToCart = () => {}, cart = [], isSyncing = false } = useCart();
 
@@ -454,6 +455,12 @@ export default function Home() {
   const handleAddToCart = async (e, product) => {
     e.preventDefault();
     e.stopPropagation();
+
+    if (!user) {
+      setShowAuthPopup(true);
+      return;
+    }
+
     const currentQty = getCartQty(product._id);
     if (product.countInStock > 0 && currentQty >= product.countInStock) return;
     try {
@@ -475,6 +482,112 @@ export default function Home() {
   return (
     <div className="jm-home">
       <ScrollToTop />
+
+      {/* ═══════ AUTH REQUIRED POPUP ═══════ */}
+      {showAuthPopup && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 99999,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "rgba(0,0,0,0.55)",
+            backdropFilter: "blur(4px)",
+            WebkitBackdropFilter: "blur(4px)",
+          }}
+          onClick={() => setShowAuthPopup(false)}
+        >
+          <div
+            style={{
+              background: "#fff",
+              borderRadius: "16px",
+              padding: "36px 32px 28px",
+              maxWidth: "420px",
+              width: "90%",
+              textAlign: "center",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
+              animation: "authPopIn 0.25s ease-out",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              style={{
+                width: "64px",
+                height: "64px",
+                borderRadius: "50%",
+                background: "linear-gradient(135deg, #f68b1e 0%, #e8590c 100%)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                margin: "0 auto 20px",
+              }}
+            >
+              <Icon icon="lucide:user-plus" width={28} style={{ color: "#fff" }} />
+            </div>
+            <h3
+              style={{
+                margin: "0 0 8px",
+                fontSize: "1.3rem",
+                fontWeight: 700,
+                color: "#212529",
+              }}
+            >
+              Create an Account First
+            </h3>
+            <p
+              style={{
+                margin: "0 0 28px",
+                fontSize: "0.9rem",
+                color: "#868e96",
+                lineHeight: 1.5,
+              }}
+            >
+              You need to register or log in before adding items to your cart. It only takes a moment!
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+              <Link
+                to="/login"
+                state={{ from: window.location.pathname + window.location.search }}
+                style={{
+                  display: "block",
+                  width: "100%",
+                  padding: "13px 0",
+                  borderRadius: "10px",
+                  background: "linear-gradient(135deg, #f68b1e 0%, #e8590c 100%)",
+                  color: "#fff",
+                  fontWeight: 700,
+                  fontSize: "0.95rem",
+                  textDecoration: "none",
+                  textAlign: "center",
+                  letterSpacing: "0.3px",
+                }}
+                onClick={() => setShowAuthPopup(false)}
+              >
+                REGISTER / LOGIN
+              </Link>
+              <button
+                type="button"
+                onClick={() => setShowAuthPopup(false)}
+                style={{
+                  background: "none",
+                  border: "1px solid #dee2e6",
+                  borderRadius: "10px",
+                  padding: "11px 0",
+                  width: "100%",
+                  cursor: "pointer",
+                  color: "#495057",
+                  fontSize: "0.88rem",
+                  fontWeight: 500,
+                }}
+              >
+                Continue Browsing
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ═══════ SEARCH RESULTS VIEW ═══════ */}
       {activeSearch ? (
@@ -912,6 +1025,7 @@ export default function Home() {
 
       <style>{`
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes authPopIn { from { opacity: 0; transform: scale(0.9) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
 
         /* ═══════ Product Card Image Gallery ═══════ */
         .jm-product-card__img-wrap {
