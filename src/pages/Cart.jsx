@@ -36,7 +36,7 @@ export default function Cart() {
   const canSeeEngPricing = user?.role === "admin" || user?.role === "engineer";
 
   const PAYSTACK_PUBLIC_KEY = "pk_live_73d373180bd0c70bd6baf9bf603136691f7b1867";
-  const ADMIN_WHATSAPP_NUMBER = "2347069383526";
+  const ADMIN_WHATSAPP_NUMBER = "2347085059169";
 
   const [backendPricing, setBackendPricing] = useState({});
   const [isPaid, setIsPaid] = useState(false);
