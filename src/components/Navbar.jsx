@@ -24,7 +24,7 @@ export default function Navbar() {
   const dropdownRef = useRef(null);
   const searchInputRef = useRef(null);
 
-  const companyName = siteSettings?.companyName || "LuphemTechnologies";
+  const companyName = siteSettings?.companyName || "Sulaitek Communication";
   const companyTagline = siteSettings?.companyTagline || "Shop smarter";
   const companyLogo = siteSettings?.logo || "";
 
