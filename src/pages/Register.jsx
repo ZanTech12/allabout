@@ -21,7 +21,7 @@ export default function Register() {
   const navigate = useNavigate();
 
   // ── Dynamic site settings (same API as Home) ──
-  const [siteName, setSiteName] = useState('SulaiTek Communication');
+  const [siteName, setSiteName] = useState('LuphemTechnologies');
   const [siteLogo, setSiteLogo] = useState('');
   const [settingsLoaded, setSettingsLoaded] = useState(false);
 
@@ -210,7 +210,7 @@ export default function Register() {
                 <label htmlFor="email">Email Address</label>
                 <div className="auth-input-wrapper">
                   <Icon icon="lucide:mail" width={18} className="auth-input-icon" />
-                  <input id="email" type="email" required value={email} onChange={handleInputChange(setEmail)} placeholder="e.g. user@SulaiTek Communication.com" autoComplete="email" className="auth-input" />
+                  <input id="email" type="email" required value={email} onChange={handleInputChange(setEmail)} placeholder="e.g. user@LuphemTechnologies.com" autoComplete="email" className="auth-input" />
                 </div>
               </div>
 

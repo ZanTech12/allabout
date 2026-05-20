@@ -429,7 +429,7 @@ export default function Cart() {
                 <div className="cart-item-details">
                   <div>
                     <Link to={`/product/${productId}`} className="cart-item-name">{item.name}</Link>
-                    <p className="cart-item-sold">Sold by SulaiTek Communication</p>
+                    <p className="cart-item-sold">Sold by LuphemTechnologies</p>
                   </div>
                   <div className="cart-item-bottom">
                     <div className="cart-qty-control">

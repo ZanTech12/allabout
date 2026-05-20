@@ -65,7 +65,7 @@ export default function ProductDetail() {
   }, []);
 
   // ✅ Destructure settings with fallback defaults
-  const companyName = siteSettings?.companyName || "SulaiTek Communication";
+  const companyName = siteSettings?.companyName || "LuphemTechnologies";
   const currency = siteSettings?.currency || "₦";
   const freeDeliveryThreshold = siteSettings?.freeDeliveryThreshold || 15000;
   const returnDays = siteSettings?.returnDays || 30;

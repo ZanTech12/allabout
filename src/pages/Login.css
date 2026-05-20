@@ -516,7 +516,7 @@
     font-size: 13px;
   }
 
-  /* Further scale OTP for very narrow screens */
+  /* Further scale OTP for very narrow screen*/
   .auth-otp-inputs {
     gap: 6px;
   }
