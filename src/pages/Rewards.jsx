@@ -42,7 +42,7 @@ export default function Rewards() {
                 <Icon icon="lucide:shopping-cart" width={24} />
               </div>
               <h3>Shop</h3>
-              <p>Place orders on MallHub</p>
+              <p>Place orders on SulaiTek Communication</p>
             </div>
             <div className="rewards-step">
               <div className="rewards-step__icon">

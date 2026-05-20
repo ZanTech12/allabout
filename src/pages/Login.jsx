@@ -22,7 +22,7 @@ export default function Login() {
   const inputRefs = useRef([]);
 
   // ── Dynamic site settings (same API as Home) ──
-  const [siteName, setSiteName] = useState('MallHub');
+  const [siteName, setSiteName] = useState('SulaiTek Communication');
   const [siteLogo, setSiteLogo] = useState('');
   const [settingsLoaded, setSettingsLoaded] = useState(false);
 
@@ -217,7 +217,7 @@ export default function Login() {
                   <label htmlFor="email">Email Address</label>
                   <div className="auth-input-wrapper">
                     <Icon icon="lucide:mail" width={18} className="auth-input-icon" />
-                    <input id="email" type="email" required value={email} onChange={handleInputChange(setEmail)} placeholder="e.g. user@mallhub.com" autoComplete="email" className="auth-input" />
+                    <input id="email" type="email" required value={email} onChange={handleInputChange(setEmail)} placeholder="e.g. user@SulaiTek Communication.com" autoComplete="email" className="auth-input" />
                   </div>
                 </div>
 
