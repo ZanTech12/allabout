@@ -1,21 +1,17 @@
 // src/pages/admin/ManageSalesReps.jsx
 import { useState, useEffect } from 'react';
-import api from '../../api/axios'; // Adjust path to your axios instance
+import api from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
-import { ADMIN_PERMISSIONS, ADMIN_ONLY_PERMISSIONS, groupPermissions } from '../../../src/config/permissions';
-import './ManageSalesReps.css'
+import { ADMIN_PERMISSIONS, ADMIN_ONLY_PERMISSIONS, groupPermissions } from '../../config/permissions';
+import './ManageSalesReps.css';
 
 const ManageSalesReps = () => {
   const { user } = useAuth();
   const [salesReps, setSalesReps] = useState([]);
   const [loading, setLoading] = useState(true);
-  
-  // Modal states
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [currentRep, setCurrentRep] = useState(null);
-  
-  // Form states
   const [formData, setFormData] = useState({
     name: '', email: '', phone: '', password: '', permissions: []
   });
@@ -35,11 +31,8 @@ const ManageSalesReps = () => {
     }
   };
 
-  useEffect(() => {
-    fetchReps();
-  }, []);
+  useEffect(() => { fetchReps(); }, []);
 
-  // ─── CREATE HANDLER ───
   const handleCreateChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
@@ -67,7 +60,6 @@ const ManageSalesReps = () => {
     }
   };
 
-  // ─── EDIT HANDLER ───
   const openEditModal = (rep) => {
     setCurrentRep(rep);
     setShowEditModal(true);
@@ -78,7 +70,6 @@ const ManageSalesReps = () => {
     const updatedPerms = currentPerms.includes(permKey)
       ? currentPerms.filter((p) => p !== permKey)
       : [...currentPerms, permKey];
-    
     setCurrentRep({ ...currentRep, permissions: updatedPerms });
   };
 
@@ -95,7 +86,6 @@ const ManageSalesReps = () => {
     }
   };
 
-  // ─── DELETE HANDLER ───
   const handleDelete = async (repId, repName) => {
     if (window.confirm(`Are you sure you want to delete ${repName}? This action cannot be undone.`)) {
       try {
@@ -109,134 +99,185 @@ const ManageSalesReps = () => {
     }
   };
 
+  const getPermLabel = (key) => {
+    return ADMIN_PERMISSIONS.find(p => p.key === key)?.label || key;
+  };
+
+  // ─── RENDER HELPERS ───
+  const renderPermTags = (permissions) => {
+    if (!permissions || permissions.length === 0) {
+      return <span className="perm-tag-empty">No access granted</span>;
+    }
+    return (
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+        {permissions.map((perm) => (
+          <span key={perm} className="perm-tag">{getPermLabel(perm)}</span>
+        ))}
+      </div>
+    );
+  };
+
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      <div className="flex justify-between items-center mb-8">
+    <div className="manage-reps-page">
+      {/* ─── HEADER ─── */}
+      <div className="manage-reps-header">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Sales Representatives</h1>
-          <p className="text-sm text-gray-500 mt-1">Manage your sales team and their page access permissions.</p>
+          <h1>Sales Representatives</h1>
+          <p>Manage your sales team and their page access permissions.</p>
         </div>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="bg-indigo-600 text-white px-5 py-2.5 rounded-lg hover:bg-indigo-700 transition shadow-sm flex items-center gap-2"
-        >
-          <span className="text-xl leading-none">+</span> Add Sales Rep
+        <button onClick={() => setShowCreateModal(true)} className="btn-add-rep">
+          <span style={{ fontSize: '1.25rem', lineHeight: 1 }}>+</span> Add Sales Rep
         </button>
       </div>
 
-      {/* ─── TABLE ─── */}
-      <div className="bg-white shadow-md rounded-lg overflow-hidden border border-gray-100">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Permissions</th>
-              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {loading ? (
+      {/* ─── LOADING STATE ─── */}
+      {loading && (
+        <div className="reps-loading">
+          <div className="spinner" />
+          <p>Loading sales representatives…</p>
+        </div>
+      )}
+
+      {/* ─── EMPTY STATE ─── */}
+      {!loading && salesReps.length === 0 && (
+        <div className="reps-empty-state">
+          <div className="empty-icon">👤</div>
+          <p>No sales representatives found. Create one to get started!</p>
+        </div>
+      )}
+
+      {/* ─── DESKTOP TABLE (hidden on mobile) ─── */}
+      {!loading && salesReps.length > 0 && (
+        <div className="reps-table-container">
+          <table className="reps-table">
+            <thead>
               <tr>
-                <td colSpan="4" className="px-6 py-10 text-center text-gray-500">Loading...</td>
+                <th>Name</th>
+                <th>Contact</th>
+                <th>Permissions</th>
+                <th style={{ textAlign: 'center' }}>Actions</th>
               </tr>
-            ) : salesReps.length === 0 ? (
-              <tr>
-                <td colSpan="4" className="px-6 py-10 text-center text-gray-500">No sales representatives found. Create one to get started!</td>
-              </tr>
-            ) : (
-              salesReps.map((rep) => (
-                <tr key={rep._id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="font-medium text-gray-900">{rep.name}</div>
-                    <div className="text-sm text-gray-500">Created: {new Date(rep.createdAt).toLocaleDateString()}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{rep.email}</div>
-                    <div className="text-sm text-gray-500">{rep.phone}</div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex flex-wrap gap-1.5">
-                      {(rep.permissions || []).map((perm) => (
-                        <span key={perm} className="px-2 py-0.5 text-xs rounded-full bg-indigo-100 text-indigo-700 font-medium">
-                          {ADMIN_PERMISSIONS.find(p => p.key === perm)?.label || perm}
-                        </span>
-                      ))}
-                      {rep.permissions.length === 0 && <span className="text-xs text-gray-400 italic">No access granted</span>}
+            </thead>
+            <tbody>
+              {salesReps.map((rep) => (
+                <tr key={rep._id}>
+                  <td>
+                    <div style={{ fontWeight: 600, color: '#111827' }}>{rep.name}</div>
+                    <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '2px' }}>
+                      Created: {new Date(rep.createdAt).toLocaleDateString()}
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-center">
-                    <button 
-                      onClick={() => openEditModal(rep)}
-                      className="text-indigo-600 hover:text-indigo-900 font-medium text-sm mr-4"
-                    >
-                      Edit Permissions
+                  <td>
+                    <div style={{ fontSize: '0.875rem', color: '#111827' }}>{rep.email}</div>
+                    <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '2px' }}>{rep.phone}</div>
+                  </td>
+                  <td>{renderPermTags(rep.permissions)}</td>
+                  <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                    <button onClick={() => openEditModal(rep)} className="action-btn action-btn-edit">
+                      Edit
                     </button>
-                    <button 
-                      onClick={() => handleDelete(rep._id, rep.name)}
-                      className="text-red-600 hover:text-red-900 font-medium text-sm"
-                    >
+                    <button onClick={() => handleDelete(rep._id, rep.name)} className="action-btn action-btn-delete">
                       Delete
                     </button>
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* ─── MOBILE CARD LIST (hidden on desktop) ─── */}
+      {!loading && salesReps.length > 0 && (
+        <div className="reps-card-list">
+          {salesReps.map((rep) => (
+            <div key={rep._id} className="rep-card">
+              <div className="rep-card-header">
+                <div>
+                  <div className="rep-card-name">{rep.name}</div>
+                  <div className="rep-card-date">
+                    Created: {new Date(rep.createdAt).toLocaleDateString()}
+                  </div>
+                </div>
+                <div className="rep-card-actions">
+                  <button onClick={() => openEditModal(rep)} className="action-btn action-btn-edit">Edit</button>
+                  <button onClick={() => handleDelete(rep._id, rep.name)} className="action-btn action-btn-delete">Delete</button>
+                </div>
+              </div>
+              <div className="rep-card-contact">
+                <span>
+                  <svg className="contact-icon" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
+                    <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
+                  </svg>
+                  {rep.email}
+                </span>
+                <span>
+                  <svg className="contact-icon" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.259 1.386a1 1 0 01-.258.944l-.57.57a11.036 11.036 0 005.09 5.09l.57-.57a1 1 0 01.944-.258l1.386.259a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
+                  </svg>
+                  {rep.phone}
+                </span>
+              </div>
+              <div className="rep-card-perms">
+                {renderPermTags(rep.permissions)}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* ─── CREATE MODAL ─── */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-200 sticky top-0 bg-white z-10">
-              <h2 className="text-xl font-bold text-gray-800">New Sales Representative</h2>
-              <p className="text-sm text-gray-500 mt-1">Fill in their details and assign page access.</p>
+        <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setShowCreateModal(false)}>
+          <div className="modal-content modal-content-create">
+            <div className="modal-header">
+              <div>
+                <h2>New Sales Representative</h2>
+                <p>Fill in their details and assign page access.</p>
+              </div>
+              <button className="modal-close-btn" onClick={() => setShowCreateModal(false)}>✕</button>
             </div>
-            
-            <form onSubmit={handleCreateSubmit} className="p-6 space-y-6">
-              {/* Basic Info */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
-                  <input type="text" name="name" value={formData.name} onChange={handleCreateChange} required className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" />
+
+            <form onSubmit={handleCreateSubmit} className="modal-body">
+              <div className="form-grid">
+                <div className="form-field">
+                  <label>Full Name</label>
+                  <input type="text" name="name" value={formData.name} onChange={handleCreateChange} required placeholder="John Doe" />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
-                  <input type="email" name="email" value={formData.email} onChange={handleCreateChange} required className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" />
+                <div className="form-field">
+                  <label>Email Address</label>
+                  <input type="email" name="email" value={formData.email} onChange={handleCreateChange} required placeholder="john@company.com" />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
-                  <input type="text" name="phone" value={formData.phone} onChange={handleCreateChange} required className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" />
+                <div className="form-field">
+                  <label>Phone Number</label>
+                  <input type="text" name="phone" value={formData.phone} onChange={handleCreateChange} required placeholder="+1 234 567 890" />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-                  <input type="password" name="password" value={formData.password} onChange={handleCreateChange} required className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" />
+                <div className="form-field">
+                  <label>Password</label>
+                  <input type="password" name="password" value={formData.password} onChange={handleCreateChange} required placeholder="••••••••" />
                 </div>
               </div>
 
-              {/* Permissions Checkboxes */}
-              <div>
-                <h3 className="text-md font-bold text-gray-800 mb-3">Assign Page Access</h3>
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div style={{ marginTop: '1.5rem' }}>
+                <div className="perm-section-title">Assign Page Access</div>
+                <div className="perm-grid">
                   {Object.entries(groupedPerms).map(([group, perms]) => (
-                    <div key={group}>
-                      <h4 className="font-semibold text-sm text-gray-700 mb-2 border-b pb-1">{group}</h4>
-                      <div className="space-y-2">
+                    <div key={group} className="perm-group">
+                      <h4>{group}</h4>
+                      <div>
                         {perms.map((perm) => {
                           const isDisabled = ADMIN_ONLY_PERMISSIONS.includes(perm.key);
                           return (
-                            <label key={perm.key} className={`flex items-center gap-2 text-sm ${isDisabled ? 'text-gray-400 cursor-not-allowed' : 'text-gray-600 cursor-pointer'}`}>
+                            <label key={perm.key} className={`perm-item ${isDisabled ? 'disabled' : ''}`}>
                               <input
                                 type="checkbox"
                                 checked={formData.permissions.includes(perm.key)}
                                 onChange={() => handlePermissionToggle(perm.key)}
                                 disabled={isDisabled}
-                                className="rounded text-indigo-600 focus:ring-indigo-500"
                               />
                               {perm.label}
-                              {isDisabled && <span className="text-[10px] text-red-400 font-medium ml-auto">ADMIN ONLY</span>}
+                              {isDisabled && <span className="admin-only-badge">Admin Only</span>}
                             </label>
                           );
                         })}
@@ -246,9 +287,9 @@ const ManageSalesReps = () => {
                 </div>
               </div>
 
-              <div className="flex justify-end gap-3 pt-4 border-t">
-                <button type="button" onClick={() => setShowCreateModal(false)} className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">Cancel</button>
-                <button type="submit" className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-sm">Create Representative</button>
+              <div className="modal-footer">
+                <button type="button" onClick={() => setShowCreateModal(false)} className="btn-cancel">Cancel</button>
+                <button type="submit" className="btn-submit">Create Representative</button>
               </div>
             </form>
           </div>
@@ -257,35 +298,35 @@ const ManageSalesReps = () => {
 
       {/* ─── EDIT PERMISSIONS MODAL ─── */}
       {showEditModal && currentRep && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-xl max-h-[80vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-200">
-              <h2 className="text-xl font-bold text-gray-800">Edit Permissions</h2>
-              <p className="text-sm text-gray-500 mt-1">Updating access for: <span className="font-semibold text-gray-900">{currentRep.name}</span></p>
+        <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setShowEditModal(false)}>
+          <div className="modal-content modal-content-edit">
+            <div className="modal-header">
+              <div>
+                <h2>Edit Permissions</h2>
+                <p>Updating access for: <strong>{currentRep.name}</strong></p>
+              </div>
+              <button className="modal-close-btn" onClick={() => setShowEditModal(false)}>✕</button>
             </div>
-            
-            <form onSubmit={handleEditSubmit} className="p-6 space-y-6">
-                            <div className="space-y-4">
+
+            <form onSubmit={handleEditSubmit} className="modal-body">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 {Object.entries(groupedPerms).map(([group, perms]) => (
                   <div key={group}>
-                    <h4 className="font-semibold text-sm text-gray-700 mb-2">{group}</h4>
-                    <div className="grid grid-cols-2 gap-2">
+                    <h4 style={{ fontSize: '0.8rem', fontWeight: 600, color: '#374151', marginBottom: '0.5rem' }}>{group}</h4>
+                    <div className="perm-edit-grid">
                       {perms.map((perm) => {
                         const isDisabled = ADMIN_ONLY_PERMISSIONS.includes(perm.key);
-                        const isChecked = currentRep.permissions?.includes(perm.key); // ✅ FIXED TYPO
+                        const isChecked = currentRep.permissions?.includes(perm.key);
                         return (
-                          <label 
-                            key={perm.key} 
-                            className={`flex items-center gap-2 text-sm p-2 rounded border ${
-                              isChecked ? 'bg-indigo-50 border-indigo-200' : 'bg-white border-gray-200'
-                            } ${isDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                          <label
+                            key={perm.key}
+                            className={`perm-item-edit ${isChecked ? 'checked' : ''} ${isDisabled ? 'disabled' : ''}`}
                           >
                             <input
                               type="checkbox"
                               checked={isChecked}
                               onChange={() => handleEditPermToggle(perm.key)}
                               disabled={isDisabled}
-                              className="rounded text-indigo-600 focus:ring-indigo-500"
                             />
                             {perm.label}
                           </label>
@@ -295,9 +336,10 @@ const ManageSalesReps = () => {
                   </div>
                 ))}
               </div>
-              <div className="flex justify-end gap-3 pt-4 border-t">
-                <button type="button" onClick={() => setShowEditModal(false)} className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">Cancel</button>
-                <button type="submit" className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-sm">Save Changes</button>
+
+              <div className="modal-footer">
+                <button type="button" onClick={() => setShowEditModal(false)} className="btn-cancel">Cancel</button>
+                <button type="submit" className="btn-submit">Save Changes</button>
               </div>
             </form>
           </div>
