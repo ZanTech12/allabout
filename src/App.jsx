@@ -18,7 +18,7 @@ import TrackOrder from "./pages/TrackOrder";
 import MyOrdersPage from "./pages/MyOrdersPage";
 import Rewards from "./pages/Rewards";
 import RegisterEngineer from "./pages/RegisterEngineer";
-import ScrollToTop from './ScrollToTop';
+import ScrollToTop from './components/ScrollToTop'; // ✅ ALREADY IMPORTED
 import api from './api/axios';
 import './App.css';
 
@@ -65,7 +65,7 @@ function App() {
     <AuthProvider>
       <CartProvider>
         <Router>
-          <ScrollToTop />
+          <ScrollToTop /> {/* ✅ ALREADY IN THE PERFECT SPOT */}
           <div className="app-layout">
             <Navbar />
             <main className="app-main">
