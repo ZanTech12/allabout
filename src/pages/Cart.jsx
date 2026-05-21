@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Icon } from '@iconify/react';
-import { usePaystackPayment } from 'react-paystack';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axios';
@@ -19,6 +18,30 @@ const getEffectivePrice = (item, isEngineer = false) => {
   return discountPrice > 0 && discountPrice < price ? discountPrice : price;
 };
 
+const BANK_ACCOUNTS = [
+  {
+    name: "Salawu Sulaimon Ayinde",
+    accountNumber: "7085059169",
+    bank: "Opay",
+    color: "#00C07F",
+    icon: "lucide:smartphone",
+  },
+  {
+    name: "Salawu Sulaimon Ayinde",
+    accountNumber: "7085059169",
+    bank: "Palmpay",
+    color: "#A855F7",
+    icon: "lucide:smartphone",
+  },
+  {
+    name: "Salawu Sulaimon Ayinde",
+    accountNumber: "0128209993",
+    bank: "GTBank",
+    color: "#E34A27",
+    icon: "lucide:building-2",
+  },
+];
+
 export default function Cart() {
   const {
     cart = [],
@@ -35,7 +58,6 @@ export default function Cart() {
   const customerEmail = user?.email || "";
   const canSeeEngPricing = user?.role === "admin" || user?.role === "engineer";
 
-  const PAYSTACK_PUBLIC_KEY = "pk_live_73d373180bd0c70bd6baf9bf603136691f7b1867";
   const ADMIN_WHATSAPP_NUMBER = "2347085059169";
 
   const [backendPricing, setBackendPricing] = useState({});
@@ -43,6 +65,10 @@ export default function Cart() {
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState("");
   const [showMobileForm, setShowMobileForm] = useState(false);
+
+  // ✅ Bank modal state
+  const [showBankModal, setShowBankModal] = useState(false);
+  const [copiedField, setCopiedField] = useState("");
 
   // ✅ Delivery settings from SiteSettings
   const [deliverySettings, setDeliverySettings] = useState({
@@ -142,14 +168,11 @@ export default function Cart() {
     return sum;
   }, 0);
 
-  // ✅ DYNAMIC: Delivery fee from settings (kept for backend payload reference)
   const { deliveryFee: configuredDeliveryFee } = deliverySettings;
   const deliveryFee = configuredDeliveryFee;
 
-  // ✅ Grand Total no longer includes delivery fee
   const grandTotal = safeSubtotal;
 
-  // ✅ Explicit Label for Pricing Tier based on Role
   const pricingTierLabel = canSeeEngPricing && validatedCart.some(i => Number(i.engineeringPrice) > 0 && Number(i.engineeringPrice) < Number(i.price))
     ? "Engineer Pricing"
     : totalSavings > 0
@@ -169,7 +192,6 @@ export default function Cart() {
   const coinDiscount = coinsToUse * 100;
   const amountToPay = grandTotal - coinDiscount;
 
-  // ✅ Coin Eligibility Calculation (Eng prices < ₦10k earn no coins)
   let eligibleAmountForCoins = 0;
   validatedCart.forEach(item => {
     const effectivePrice = getEffectivePrice(item, canSeeEngPricing);
@@ -183,7 +205,6 @@ export default function Cart() {
     eligibleAmountForCoins += effectivePrice * safeQuantity;
   });
 
-  // ✅ Removed deliveryFee from coins earned calculation
   const coinsEarned = Math.floor(Math.max(0, eligibleAmountForCoins - coinDiscount) / 10000);
 
   const getProductId = (item) => item.product?._id || item.product;
@@ -211,6 +232,38 @@ export default function Cart() {
     return message;
   };
 
+  // ✅ Bank Transfer WhatsApp message — sent after confirming transfer
+  const buildBankTransferWhatsAppMessage = (reference) => {
+    let message = "🏦 *BANK TRANSFER NOTIFICATION*\n\n";
+    message += "I have made a bank transfer for my order:\n\n";
+    message += "━━━━━━━━━━━━━━━━━━\n";
+    message += "🛒 *ITEMS ORDERED:*\n\n";
+    validatedCart.forEach((item, index) => {
+      const effectivePrice = getEffectivePrice(item, canSeeEngPricing);
+      const safeQuantity = Number(item.quantity) || 1;
+      message += `*${index + 1}. ${item.name}*\n`;
+      message += `   Qty: ${safeQuantity}  •  ₦${(effectivePrice * safeQuantity).toLocaleString()}\n\n`;
+    });
+    message += "━━━━━━━━━━━━━━━━━━\n\n";
+    message += `*Pricing:* ${pricingTierLabel}\n`;
+    message += `*Subtotal:* ₦${safeSubtotal.toLocaleString()}\n`;
+    if (coinDiscount > 0) {
+      message += `*Coin Discount:* -₦${coinDiscount.toLocaleString()} (${coinsToUse} coins)\n`;
+    }
+    message += `*Amount Transferred:* ₦${amountToPay.toLocaleString()}\n\n`;
+    message += "━━━━━━━━━━━━━━━━━━\n";
+    message += "📦 *DELIVERY DETAILS:*\n\n";
+    message += `👤 Name: ${shippingInfo.fullName}\n`;
+    message += `📍 Address: ${shippingInfo.street}${shippingInfo.apartment ? `, ${shippingInfo.apartment}` : ''}\n`;
+    message += `🏙️ City: ${shippingInfo.city}, ${shippingInfo.state}\n`;
+    message += `📮 Zip: ${shippingInfo.zipCode}\n`;
+    message += `📱 Phone: ${shippingInfo.phone}\n\n`;
+    message += "━━━━━━━━━━━━━━━━━━\n";
+    message += `🔢 *Order Ref:* ${reference}\n\n`;
+    message += "Please confirm receipt of payment. Thank you! 🙏";
+    return message;
+  };
+
   const validateShipping = () => {
     if (!shippingInfo.fullName || !shippingInfo.street || !shippingInfo.city ||
         !shippingInfo.state || !shippingInfo.zipCode || !shippingInfo.phone) {
@@ -221,7 +274,7 @@ export default function Cart() {
     return true;
   };
 
-  const buildOrderPayload = (paymentMethod, paystackReference) => ({
+  const buildOrderPayload = (paymentMethod, transactionRef) => ({
     items: validatedCart.map((item) => ({
       product: getProductId(item),
       name: item.name,
@@ -232,15 +285,73 @@ export default function Cart() {
       quantity: Number(item.quantity) || 1,
     })),
     subtotal: safeSubtotal,
-    deliveryFee, // Sent to backend for reference, but not charged to user
+    deliveryFee,
     total: grandTotal,
     coinsUsed: coinsToUse,
     coinDiscount: coinDiscount,
     amountPaid: amountToPay,
     paymentMethod,
-    paystackReference: paystackReference || undefined,
+    bankTransferReference: transactionRef || undefined,
     shippingAddress: shippingInfo,
   });
+
+  // ✅ Copy to clipboard helper
+  const copyToClipboard = async (text, fieldKey) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedField(fieldKey);
+      setTimeout(() => setCopiedField(""), 2000);
+    } catch (err) {
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+      textarea.select();
+      try {
+        document.execCommand("copy");
+        setCopiedField(fieldKey);
+        setTimeout(() => setCopiedField(""), 2000);
+      } catch (e) {
+        console.error("Failed to copy:", e);
+      }
+      document.body.removeChild(textarea);
+    }
+  };
+
+  // ✅ Bank Transfer payment handler — opens the modal
+  const handleBankTransfer = () => {
+    if (placing) return;
+    if (!validateShipping()) return setShowMobileForm(true);
+    setShowBankModal(true);
+  };
+
+  // ✅ Confirm bank transfer — places the order AND sends to WhatsApp
+  const handleConfirmTransfer = async () => {
+    if (placing) return;
+    setPlacing(true);
+    setError("");
+    try {
+      const reference = `BT-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+      const orderData = buildOrderPayload("bank_transfer", reference);
+      await api.post("/orders", orderData);
+
+      // ✅ Send transfer details to WhatsApp
+      const message = buildBankTransferWhatsAppMessage(reference);
+      window.open(
+        `https://wa.me/${ADMIN_WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`,
+        "_blank"
+      );
+
+      await clearCart();
+      setShowBankModal(false);
+      setIsPaid(true);
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to place order. Please try again.");
+    } finally {
+      setPlacing(false);
+    }
+  };
 
   // ✅ Full coin payment handler
   const handleFullCoinPayment = async () => {
@@ -264,13 +375,13 @@ export default function Cart() {
           quantity: Number(item.quantity) || 1,
         })),
         subtotal: safeSubtotal,
-        deliveryFee, // Sent to backend for reference
+        deliveryFee,
         total: grandTotal,
         coinsUsed: coinsForPayment,
         coinDiscount: coinsForPayment * 100,
         amountPaid: 0,
         paymentMethod: "coins",
-        paystackReference: undefined,
+        bankTransferReference: undefined,
         shippingAddress: shippingInfo,
       };
 
@@ -306,57 +417,6 @@ export default function Cart() {
     } finally {
       setPlacing(false);
     }
-  };
-
-  const paystackConfig = {
-    reference: (new Date()).getTime().toString(),
-    email: customerEmail || "no-email@provided.com",
-    amount: amountToPay * 100,
-    publicKey: PAYSTACK_PUBLIC_KEY,
-    currency: "NGN",
-    metadata: {
-      custom_fields: [
-        {
-          display_name: "Cart Items",
-          variable_name: "cart_items",
-          value: validatedCart.map(item => `${item.name} (x${item.quantity})`).join(', ')
-        }
-      ]
-    }
-  };
-
-  const initializePayment = usePaystackPayment(paystackConfig);
-
-  const handlePaystackCheckout = () => {
-    if (placing) return;
-    if (!validateShipping()) return setShowMobileForm(true);
-
-    if (!customerEmail) {
-      setError("No email found. Please ensure you are logged in.");
-      return;
-    }
-
-    initializePayment(onSuccess, onClose);
-  };
-
-  const onSuccess = async (reference) => {
-    setPlacing(true);
-    setError("");
-    try {
-      const orderData = buildOrderPayload("paystack", reference.reference);
-      await api.post("/orders", orderData);
-      await clearCart();
-      setIsPaid(true);
-    } catch (err) {
-      setError(err.response?.data?.message || "Payment received but order save failed.");
-      setIsPaid(true);
-    } finally {
-      setPlacing(false);
-    }
-  };
-
-  const onClose = () => {
-    console.log("Payment closed by user.");
   };
 
   if (isLoading) {
@@ -399,6 +459,102 @@ export default function Cart() {
         <div className="cart-sync-banner">
           <Icon icon="lucide:loader-2" width={14} style={{ animation: 'spin 1s linear infinite' }} />
           Saving cart...
+        </div>
+      )}
+
+      {/* ✅ Bank Details Modal */}
+      {showBankModal && (
+        <div className="bank-modal-overlay" onClick={() => setShowBankModal(false)}>
+          <div className="bank-modal" onClick={(e) => e.stopPropagation()}>
+            <button className="bank-modal-close" onClick={() => setShowBankModal(false)}>
+              <Icon icon="lucide:x" width={20} />
+            </button>
+
+            <div className="bank-modal-header">
+              <div className="bank-modal-icon-wrap">
+                <Icon icon="lucide:building-2" width={28} color="#f68b1e" />
+              </div>
+              <h2>Bank Transfer Details</h2>
+              <p>Transfer the exact amount below to any of these accounts</p>
+            </div>
+
+            <div className="bank-modal-amount">
+              <span className="bank-modal-amount-label">Amount to Pay</span>
+              <span className="bank-modal-amount-value">₦{amountToPay.toLocaleString()}</span>
+              {coinsToUse > 0 && (
+                <span className="bank-modal-amount-coins">
+                  + {coinsToUse} coins applied (₦{coinDiscount.toLocaleString()} off)
+                </span>
+              )}
+            </div>
+
+            <div className="bank-modal-accounts">
+              {BANK_ACCOUNTS.map((account, index) => (
+                <div key={index} className="bank-account-card">
+                  <div className="bank-account-top">
+                    <div className="bank-account-icon" style={{ background: `${account.color}15`, color: account.color }}>
+                      <Icon icon={account.icon} width={18} />
+                    </div>
+                    <span className="bank-account-bank" style={{ color: account.color }}>{account.bank}</span>
+                  </div>
+
+                  <div className="bank-account-field">
+                    <span className="bank-account-label">Account Name</span>
+                    <div className="bank-account-value-row">
+                      <span className="bank-account-value">{account.name}</span>
+                      <button
+                        className={`bank-copy-btn ${copiedField === `name-${index}` ? "copied" : ""}`}
+                        onClick={() => copyToClipboard(account.name, `name-${index}`)}
+                      >
+                        <Icon icon={copiedField === `name-${index}` ? "lucide:check" : "lucide:copy"} width={14} />
+                        {copiedField === `name-${index}` ? "Copied" : "Copy"}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="bank-account-field">
+                    <span className="bank-account-label">Account Number</span>
+                    <div className="bank-account-value-row">
+                      <span className="bank-account-value bank-account-number">{account.accountNumber}</span>
+                      <button
+                        className={`bank-copy-btn ${copiedField === `acc-${index}` ? "copied" : ""}`}
+                        onClick={() => copyToClipboard(account.accountNumber, `acc-${index}`)}
+                      >
+                        <Icon icon={copiedField === `acc-${index}` ? "lucide:check" : "lucide:copy"} width={14} />
+                        {copiedField === `acc-${index}` ? "Copied" : "Copy"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="bank-modal-notice">
+              <Icon icon="lucide:info" width={16} />
+              <span>Transfer <strong>exactly ₦{amountToPay.toLocaleString()}</strong> then click the button below. Your order details and payment info will be sent to us via WhatsApp for confirmation.</span>
+            </div>
+
+            <div className="bank-modal-actions">
+              <button
+                className="bank-modal-confirm-btn"
+                onClick={handleConfirmTransfer}
+                disabled={placing}
+              >
+                {placing ? (
+                  <><Icon icon="lucide:loader-2" width={16} style={{ animation: 'spin 1s linear infinite' }} /> Processing...</>
+                ) : (
+                  <><Icon icon="mdi:whatsapp" width={18} /> I've Made the Transfer — Send on WhatsApp</>
+                )}
+              </button>
+              <button
+                className="bank-modal-cancel-btn"
+                onClick={() => setShowBankModal(false)}
+                disabled={placing}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -716,15 +872,15 @@ export default function Cart() {
             ) : (
               <button
                 className="cart-checkout-btn"
-                onClick={handlePaystackCheckout}
+                onClick={handleBankTransfer}
                 disabled={placing || isSyncing || amountToPay < 0}
               >
                 {placing || isSyncing ? (
                   <><Icon icon="lucide:loader-2" width={16} style={{ animation: 'spin 1s linear infinite' }} /> Processing...</>
                 ) : (
                   <>
-                    <Icon icon="lucide:lock" width={16} />
-                    Pay ₦{amountToPay.toLocaleString()} Securely
+                    <Icon icon="lucide:building-2" width={16} />
+                    Pay ₦{amountToPay.toLocaleString()} via Bank Transfer
                     {coinsToUse > 0 && <span style={{ opacity: 0.8, marginLeft: '4px' }}>+ {coinsToUse} coins</span>}
                   </>
                 )}
@@ -794,7 +950,7 @@ export default function Cart() {
               </button>
             ) : (
               <button
-                onClick={handlePaystackCheckout}
+                onClick={handleBankTransfer}
                 disabled={placing || isSyncing}
                 className="cart-mobile-pay-btn"
               >
