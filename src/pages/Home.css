@@ -2139,3 +2139,178 @@ a.jm-footer__contact-item:hover { color: var(--jm-primary); }
   .jm-hero-cta { border: 2px solid ButtonText; }
   .jm-carousel-dot { border: 1px solid ButtonText; }
 }
+/* Effect */
+/* ============================================
+   MODERN CINEMATIC SLIDE IN & OUT EFFECTS
+   ============================================ */
+
+/* ── Base Slide Container ── */
+.jm-hero-slide {
+  position: absolute;
+  inset: 0;
+  transition: transform 0.9s cubic-bezier(0.65, 0, 0.35, 1), 
+              opacity 0.9s ease-out,
+              filter 0.9s ease-out;
+  will-change: transform, opacity, filter;
+  pointer-events: none;
+  
+  /* Inactive state (Faded, scaled down, blurred) */
+  transform: scale(0.96);
+  opacity: 0;
+  filter: blur(8px) brightness(0.6);
+  z-index: 1;
+}
+
+.jm-hero-slide--active {
+  /* Active state (Sharp, centered, bright) */
+  transform: scale(1);
+  opacity: 1;
+  filter: blur(0px) brightness(1);
+  z-index: 2;
+  pointer-events: auto;
+}
+
+/* ── 1. Anamorphic Light Leak Overlay ── */
+.jm-hero-flash-overlay {
+  position: absolute;
+  inset: 0;
+  width: 150%; 
+  left: -25%;
+  background: linear-gradient(
+    90deg, 
+    transparent 0%, 
+    rgba(255, 255, 255, 0) 30%, 
+    rgba(255, 255, 255, 0.85) 48%, 
+    rgba(110, 231, 183, 0.4) 52%, 
+    rgba(255, 255, 255, 0) 70%, 
+    transparent 100%
+  );
+  opacity: 0;
+  z-index: 8;
+  pointer-events: none;
+  filter: blur(8px); 
+}
+
+.jm-hero-carousel--flash .jm-hero-flash-overlay {
+  animation: cinematicSweep 1.1s cubic-bezier(0.74, 0.04, 0.28, 1) forwards;
+}
+
+@keyframes cinematicSweep {
+  0% { transform: translateX(-60%); opacity: 1; }
+  60% { opacity: 1; }
+  100% { transform: translateX(60%); opacity: 0; }
+}
+
+/* ── 2. Focus Pull & Ken Burns (Image) ── */
+.jm-hero-slide__img {
+  transition: transform 1.2s cubic-bezier(0.16, 1, 0.3, 1), 
+              filter 1s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform, filter;
+}
+
+.jm-hero-slide:not(.jm-hero-slide--active) .jm-hero-slide__img {
+  transform: scale(1.25) translateX(50px);
+  filter: blur(8px) brightness(0.3) saturate(0);
+}
+
+.jm-hero-slide--active .jm-hero-slide__img {
+  transform: scale(1) translateX(0);
+  filter: brightness(1.1) saturate(1.2);
+}
+
+/* ── 3. Whip Pan & Slide In/Out (Text) ── */
+.jm-hero-tag,
+.jm-hero-title,
+.jm-hero-sub,
+.jm-hero-price,
+.jm-hero-cta {
+  transition: transform 0.8s cubic-bezier(0.16, 1, 0.3, 1),
+              opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1),
+              filter 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform, opacity, filter;
+}
+
+.jm-hero-slide:not(.jm-hero-slide--active) .jm-hero-tag,
+.jm-hero-slide:not(.jm-hero-slide--active) .jm-hero-title,
+.jm-hero-slide:not(.jm-hero-slide--active) .jm-hero-sub,
+.jm-hero-slide:not(.jm-hero-slide--active) .jm-hero-price,
+.jm-hero-slide:not(.jm-hero-slide--active) .jm-hero-cta {
+  opacity: 0;
+  transform: translateX(-80px) skewX(-8deg);
+  filter: blur(6px) brightness(2.5);
+}
+
+.jm-hero-slide--active .jm-hero-tag,
+.jm-hero-slide--active .jm-hero-title,
+.jm-hero-slide--active .jm-hero-sub,
+.jm-hero-slide--active .jm-hero-price,
+.jm-hero-slide--active .jm-hero-cta {
+  opacity: 1;
+  transform: translateX(0) skewX(0deg);
+  filter: blur(0px) brightness(1);
+}
+
+.jm-hero-slide--active .jm-hero-tag { transition-delay: 0.1s; }
+.jm-hero-slide--active .jm-hero-title { transition-delay: 0.2s; }
+.jm-hero-slide--active .jm-hero-sub { transition-delay: 0.3s; }
+.jm-hero-slide--active .jm-hero-price { transition-delay: 0.4s; }
+.jm-hero-slide--active .jm-hero-cta { transition-delay: 0.5s; }
+
+.jm-hero-slide:not(.jm-hero-slide--active) .jm-hero-tag,
+.jm-hero-slide:not(.jm-hero-slide--active) .jm-hero-title,
+.jm-hero-slide:not(.jm-hero-slide--active) .jm-hero-sub,
+.jm-hero-slide:not(.jm-hero-slide--active) .jm-hero-price,
+.jm-hero-slide:not(.jm-hero-slide--active) .jm-hero-cta {
+  transition-delay: 0s; 
+}
+
+/* ── 4. Metallic CTA Sweep ── */
+.jm-hero-cta {
+  background-size: 200% auto;
+  background-image: linear-gradient(90deg, var(--jm-primary) 0%, var(--jm-primary) 40%, #6ee7b7 50%, var(--jm-primary) 60%, var(--jm-primary) 100%);
+}
+
+.jm-hero-carousel--flash .jm-hero-cta {
+  animation: ctaMetallicSweep 1.2s ease-in-out 0.6s both;
+}
+
+@keyframes ctaMetallicSweep {
+  0% { background-position: -200% center; box-shadow: 0 4px 20px rgba(5, 150, 105, 0.35); }
+  50% { background-position: 200% center; box-shadow: 0 4px 30px rgba(110, 231, 183, 0.8), 0 0 15px rgba(255, 255, 255, 0.4); }
+  100% { background-position: -200% center; box-shadow: 0 4px 20px rgba(5, 150, 105, 0.35); }
+}
+
+/* ── 5. Cinematic Ambient Pulse ── */
+.jm-hero-carousel--flash {
+  animation: ambientGlow 2.5s ease-out forwards;
+}
+
+@keyframes ambientGlow {
+  0% { box-shadow: inset 0 0 100px rgba(0,0,0,0.8); }
+  30% { box-shadow: inset 0 0 20px rgba(0,0,0,0.1); }
+  100% { box-shadow: none; }
+}
+
+/* ── Accessibility: Reduced Motion ── */
+@media (prefers-reduced-motion: reduce) {
+  .jm-hero-carousel--flash,
+  .jm-hero-carousel--flash .jm-hero-flash-overlay,
+  .jm-hero-cta,
+  .jm-hero-slide,
+  .jm-hero-slide__img,
+  .jm-hero-tag,
+  .jm-hero-title,
+  .jm-hero-sub,
+  .jm-hero-price,
+  .jm-hero-cta {
+    animation: none !important;
+    transition: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
+    box-shadow: none !important;
+  }
+  .jm-hero-cta {
+    background-image: var(--jm-primary) !important;
+  }
+}

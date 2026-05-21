@@ -324,6 +324,8 @@ export default function Home() {
   const [showAuthPopup, setShowAuthPopup] = useState(false);
   const [selectedHomeCat, setSelectedHomeCat] = useState("");
   const [browseExpanded, setBrowseExpanded] = useState(false);
+  const [isFlashing, setIsFlashing] = useState(false);
+  const [expandedCats, setExpandedCats] = useState(new Set()); // <-- Track expanded categories
 
   const { addToCart = () => {}, cart = [], isSyncing = false } = useCart();
 
@@ -412,6 +414,19 @@ export default function Home() {
     });
   }, [selectedHomeCat, productCategories, products]);
 
+  // ═══════ Toggle category expand/collapse ═══════
+  const toggleCatExpand = (catName) => {
+    setExpandedCats((prev) => {
+      const next = new Set(prev);
+      if (next.has(catName)) {
+        next.delete(catName);
+      } else {
+        next.add(catName);
+      }
+      return next;
+    });
+  };
+
   useEffect(() => {
     const fetchAll = async () => {
       try {
@@ -456,7 +471,13 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    const timer = setInterval(() => setCurrentSlide((p) => (p + 1) % heroSlides.length), 5000);
+    const timer = setInterval(() => {
+      setCurrentSlide((p) => (p + 1) % heroSlides.length);
+      
+      // Trigger the flash automation
+      setIsFlashing(true);
+      setTimeout(() => setIsFlashing(false), 600); // Remove class after animation completes
+    }, 5000);
     return () => clearInterval(timer);
   }, [heroSlides.length]);
 
@@ -670,9 +691,9 @@ export default function Home() {
 
       {/* ═══════ HERO SECTION ═══════ */}
       <section className="jm-hero-section">
-        <div className="jm-hero-carousel">
+        <div className={`jm-hero-carousel ${isFlashing ? "jm-hero-carousel--flash" : ""}`}>
           {heroSlides.map((slide, idx) => (
-            <div key={idx} className="jm-hero-slide" style={{ opacity: idx === currentSlide ? 1 : 0, zIndex: idx === currentSlide ? 1 : 0 }}>
+            <div key={idx} className={`jm-hero-slide ${idx === currentSlide ? "jm-hero-slide--active" : ""}`}>
               <div className="jm-hero-slide__bg" style={{ background: slide.bg }} />
               {slide.img && <img src={slide.img} alt="" className="jm-hero-slide__img" loading={idx === 0 ? "eager" : "lazy"} />}
               <div className="jm-hero-slide__overlay" />
@@ -685,6 +706,10 @@ export default function Home() {
               </div>
             </div>
           ))}
+          
+          {/* Flash Overlay Element */}
+          <div className="jm-hero-flash-overlay" aria-hidden="true"></div>
+          
           <button className="jm-carousel-arrow jm-carousel-arrow--prev" onClick={() => setCurrentSlide((p) => (p - 1 + heroSlides.length) % heroSlides.length)} aria-label="Previous"><Icon icon="lucide:chevron-left" width={24} /></button>
           <button className="jm-carousel-arrow jm-carousel-arrow--next" onClick={() => setCurrentSlide((p) => (p + 1) % heroSlides.length)} aria-label="Next"><Icon icon="lucide:chevron-right" width={24} /></button>
           <div className="jm-carousel-dots">
@@ -936,25 +961,40 @@ export default function Home() {
       )}
 
       {/* ═══════ ALL CATEGORIES PRODUCT LIST ═══════ */}
-      {!loading && Object.entries(productCategories).map(([catName, items]) => (
-        <section key={catName} className="jm-section">
-          <div className="jm-section__header">
-            <div className="jm-section__header-left">
-              <div className="jm-section__cat-icon"><Icon icon={getCatIcon(catName)} width={16} /></div>
-              <div>
-                <h3 className="jm-section__subtitle">{catName}</h3>
-                <p className="jm-section__meta">{items.length} product{items.length !== 1 ? "s" : ""} · {priceRange(items, currency)}</p>
+      {!loading && Object.entries(productCategories).map(([catName, items]) => {
+        const isExpanded = expandedCats.has(catName);
+        const displayItems = isExpanded ? items : items.slice(0, 10);
+        const hasMore = items.length > 10;
+
+        return (
+          <section key={catName} className="jm-section">
+            <div className="jm-section__header">
+              <div className="jm-section__header-left">
+                <div className="jm-section__cat-icon"><Icon icon={getCatIcon(catName)} width={16} /></div>
+                <div>
+                  <h3 className="jm-section__subtitle">{catName}</h3>
+                  <p className="jm-section__meta">{items.length} product{items.length !== 1 ? "s" : ""} · {priceRange(items, currency)}</p>
+                </div>
               </div>
+              {hasMore && (
+                <button
+                  type="button"
+                  onClick={() => toggleCatExpand(catName)}
+                  className="jm-section__see-all"
+                  style={{ background: "none", border: "none", cursor: "pointer", font: "inherit" }}
+                >
+                  {isExpanded ? "SHOW LESS" : "VIEW ALL"} <Icon icon={isExpanded ? "lucide:chevron-up" : "lucide:chevron-right"} width={14} />
+                </button>
+              )}
             </div>
-            <Link to={`/products?category=${catName}`} className="jm-section__see-all">VIEW ALL <Icon icon="lucide:chevron-right" width={14} /></Link>
-          </div>
-          <div className="jm-product-grid jm-product-grid--4">
-            {items.map((p) => (
-              <ProductCard key={`list-${catName}-${p._id}`} p={p} prefix={`list-${catName}-`} currency={currency} cartQty={getCartQty(p._id)} isSyncing={isSyncing} onAddToCart={handleAddToCart} canSeeEngPricing={canSeeEngPricing} />
-            ))}
-          </div>
-        </section>
-      ))}
+            <div className="jm-product-grid jm-product-grid--4">
+              {displayItems.map((p) => (
+                <ProductCard key={`list-${catName}-${p._id}`} p={p} prefix={`list-${catName}-`} currency={currency} cartQty={getCartQty(p._id)} isSyncing={isSyncing} onAddToCart={handleAddToCart} canSeeEngPricing={canSeeEngPricing} />
+              ))}
+            </div>
+          </section>
+        );
+      })}
 
       {/* ═══════ WHY SHOP WITH US ═══════ */}
       <section className="jm-section jm-trust-section">
