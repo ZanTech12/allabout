@@ -322,6 +322,8 @@ export default function Home() {
   const [activeCat, setActiveCat] = useState("");
   const [productCategories, setProductCategories] = useState({});
   const [showAuthPopup, setShowAuthPopup] = useState(false);
+  const [selectedHomeCat, setSelectedHomeCat] = useState("");
+  const [browseExpanded, setBrowseExpanded] = useState(false);
 
   const { addToCart = () => {}, cart = [], isSyncing = false } = useCart();
 
@@ -385,6 +387,31 @@ export default function Home() {
     );
   }, [products, activeSearch]);
 
+  const homeCategories = useMemo(() => {
+    const homeCats = categories.filter(c => c.showInHome === true);
+    if (homeCats.length === 0) {
+      return categories.filter(c => productCategories[c.name] && productCategories[c.name].length > 0);
+    }
+    return homeCats;
+  }, [categories, productCategories]);
+
+  const homeCatProducts = useMemo(() => {
+    if (!selectedHomeCat) return [];
+    if (selectedHomeCat === "__all__") {
+      return [...products].sort((a, b) => {
+        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return dateB - dateA;
+      });
+    }
+    const prods = productCategories[selectedHomeCat] || [];
+    return [...prods].sort((a, b) => {
+      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return dateB - dateA;
+    });
+  }, [selectedHomeCat, productCategories, products]);
+
   useEffect(() => {
     const fetchAll = async () => {
       try {
@@ -417,6 +444,8 @@ export default function Home() {
 
         const keys = Object.keys(mappedCategories);
         if (keys.length) setActiveCat(keys[0]);
+        
+        setSelectedHomeCat("__all__");
       } catch (error) {
         console.error("Could not fetch data", error);
       } finally {
@@ -706,6 +735,76 @@ export default function Home() {
         ))}
       </section>
 
+      {/* ═══════ BROWSE BY CATEGORY ═══════ */}
+      {!loading && homeCategories.length > 0 && (
+        <section className="jm-section">
+          <div className="jm-section__header">
+            <div className="jm-section__header-left">
+              <Icon icon="lucide:layout-grid" width={18} className="jm-section__header-icon" />
+              <h2 className="jm-section__title">BROWSE BY CATEGORY</h2>
+            </div>
+          </div>
+
+          <div className="jm-home-cat-select-wrap">
+            <div className="jm-home-cat-select__icon">
+              <Icon icon={selectedHomeCat === "__all__" ? "lucide:layout-grid" : (homeCategories.find(c => c.name === selectedHomeCat)?.icon || "lucide:package")} width={18} />
+            </div>
+            <select
+              className="jm-home-cat-select"
+              value={selectedHomeCat}
+              onChange={(e) => { setSelectedHomeCat(e.target.value); setBrowseExpanded(false); }}
+              aria-label="Select a category"
+            >
+              <option value="__all__">All</option>
+              {homeCategories.map((cat) => (
+                <option key={cat._id} value={cat.name}>{cat.name}</option>
+              ))}
+            </select>
+            <Icon icon="lucide:chevron-down" width={16} className="jm-home-cat-select__arrow" />
+          </div>
+
+          {selectedHomeCat && homeCatProducts.length > 0 && (
+            <>
+              <div className="jm-section__header" style={{ marginTop: "20px" }}>
+                <div className="jm-section__header-left">
+                  <div className="jm-section__cat-icon">
+                    <Icon icon={selectedHomeCat === "__all__" ? "lucide:layout-grid" : (homeCategories.find(c => c.name === selectedHomeCat)?.icon || "lucide:package")} width={16} />
+                  </div>
+                  <div>
+                    <h3 className="jm-section__subtitle">{selectedHomeCat === "__all__" ? "All Products" : selectedHomeCat}</h3>
+                    <p className="jm-section__meta">{homeCatProducts.length} products · {priceRange(homeCatProducts, currency)}</p>
+                  </div>
+                </div>
+                {homeCatProducts.length > 20 && (
+                  <button
+                    type="button"
+                    onClick={() => setBrowseExpanded((prev) => !prev)}
+                    className="jm-section__see-all"
+                    style={{ background: "none", border: "none", cursor: "pointer", font: "inherit" }}
+                  >
+                    {browseExpanded ? "SHOW LESS" : "VIEW ALL"} <Icon icon={browseExpanded ? "lucide:chevron-up" : "lucide:chevron-right"} width={14} />
+                  </button>
+                )}
+              </div>
+              <div className="jm-product-grid jm-product-grid--4">
+                {homeCatProducts.slice(0, browseExpanded ? homeCatProducts.length : 20).map((p) => (
+                  <ProductCard
+                    key={`homecat-${p._id}`}
+                    p={p}
+                    prefix="homecat-"
+                    currency={currency}
+                    cartQty={getCartQty(p._id)}
+                    isSyncing={isSyncing}
+                    onAddToCart={handleAddToCart}
+                    canSeeEngPricing={canSeeEngPricing}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+        </section>
+      )}
+
       {/* ═══════ FLASH SALES ═══════ */}
       {!loading && flashSaleProducts.length > 0 && (
         <section className="jm-section jm-flash-section">
@@ -784,79 +883,6 @@ export default function Home() {
           <div className="jm-product-grid jm-product-grid--6">
             {featuredProducts.slice(0, 6).map((p) => (
               <ProductCard key={`deal-${p._id}`} p={p} prefix="deal-" compact currency={currency} cartQty={getCartQty(p._id)} isSyncing={isSyncing} onAddToCart={handleAddToCart} canSeeEngPricing={canSeeEngPricing} />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* ═══════ PRODUCT CATALOGUE WITH SELECT DROPDOWN ═══════ */}
-      {!loading && Object.keys(productCategories).length > 0 && (
-        <section className="jm-catalogue-section">
-          <div className="jm-section">
-            <div className="jm-section__header">
-              <div className="jm-section__header-left">
-                <Icon icon="lucide:layout-grid" width={18} className="jm-section__header-icon" />
-                <h2 className="jm-section__title">PRODUCT CATALOGUE</h2>
-              </div>
-              <Link to="/products" className="jm-section__see-all">VIEW ALL <Icon icon="lucide:chevron-right" width={14} /></Link>
-            </div>
-
-            {/* ═══════ SELECT DROPDOWN FOR CATEGORIES ═══════ */}
-            <div className="jm-cat-select-wrap">
-              <div className="jm-cat-select__icon">
-                <Icon icon={getCatIcon(activeCat)} width={18} />
-              </div>
-              <select
-                className="jm-cat-select"
-                value={activeCat}
-                onChange={(e) => setActiveCat(e.target.value)}
-                aria-label="Select a category"
-              >
-                {Object.keys(productCategories).map((cat) => (
-                  <option key={cat} value={cat}>
-                    {cat}  ·  {productCategories[cat].length} products  ·  {priceRange(productCategories[cat], currency)}
-                  </option>
-                ))}
-              </select>
-              <Icon icon="lucide:chevron-down" width={16} className="jm-cat-select__arrow" />
-            </div>
-          </div>
-
-          {activeCat && productCategories[activeCat] && (
-            <div className="jm-section jm-catalogue-products">
-              <div className="jm-section__header">
-                <div className="jm-section__header-left">
-                  <div className="jm-section__cat-icon"><Icon icon={getCatIcon(activeCat)} width={16} /></div>
-                  <div>
-                    <h3 className="jm-section__subtitle">{activeCat}</h3>
-                    <p className="jm-section__meta">{productCategories[activeCat].length} products · {priceRange(productCategories[activeCat], currency)}</p>
-                  </div>
-                </div>
-                <Link to={`/products?category=${activeCat}`} className="jm-section__see-all">VIEW ALL <Icon icon="lucide:chevron-right" width={14} /></Link>
-              </div>
-              <div className="jm-product-grid jm-product-grid--4">
-                {productCategories[activeCat].map((p) => (
-                  <ProductCard key={`cat-${p._id}`} p={p} prefix={`cat-${activeCat}-`} currency={currency} cartQty={getCartQty(p._id)} isSyncing={isSyncing} onAddToCart={handleAddToCart} canSeeEngPricing={canSeeEngPricing} />
-                ))}
-              </div>
-            </div>
-          )}
-        </section>
-      )}
-
-      {/* ═══════ NEW ARRIVALS ═══════ */}
-      {!loading && newArrivalProducts.length > 0 && (
-        <section className="jm-section">
-          <div className="jm-section__header">
-            <div className="jm-section__header-left">
-              <span className="jm-section__dot" />
-              <h2 className="jm-section__title">NEW ARRIVALS</h2>
-            </div>
-            <Link to="/products?new=true" className="jm-section__see-all">SEE ALL <Icon icon="lucide:chevron-right" width={14} /></Link>
-          </div>
-          <div className="jm-product-grid jm-product-grid--5">
-            {newArrivalProducts.slice(0, 10).map((p) => (
-              <ProductCard key={`new-${p._id}`} p={p} prefix="new-" showNew currency={currency} cartQty={getCartQty(p._id)} isSyncing={isSyncing} onAddToCart={handleAddToCart} canSeeEngPricing={canSeeEngPricing} />
             ))}
           </div>
         </section>
@@ -1279,6 +1305,103 @@ export default function Home() {
           }
 
           .jm-cat-select__arrow {
+            right: 12px;
+          }
+        }
+
+        /* ═══════ Home Category Dropdown ═══════ */
+        .jm-home-cat-select-wrap {
+          position: relative;
+          display: flex;
+          align-items: center;
+          max-width: 460px;
+          width: 100%;
+          margin-bottom: 20px;
+        }
+
+        .jm-home-cat-select__icon {
+          position: absolute;
+          left: 14px;
+          z-index: 1;
+          color: #868e96;
+          pointer-events: none;
+          display: flex;
+          align-items: center;
+          transition: color 0.2s ease;
+        }
+
+        .jm-home-cat-select-wrap:focus-within .jm-home-cat-select__icon {
+          color: #f68b1e;
+        }
+
+        .jm-home-cat-select {
+          width: 100%;
+          padding: 12px 40px 12px 42px;
+          font-size: 0.92rem;
+          font-weight: 500;
+          font-family: inherit;
+          border: 2px solid #e9ecef;
+          border-radius: 12px;
+          background: #fff;
+          color: #212529;
+          cursor: pointer;
+          appearance: none;
+          -webkit-appearance: none;
+          -moz-appearance: none;
+          outline: none;
+          transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.15s ease;
+          line-height: 1.4;
+        }
+
+        .jm-home-cat-select:hover {
+          border-color: #ced4da;
+          background: #fafbfc;
+        }
+
+        .jm-home-cat-select:focus {
+          border-color: #f68b1e;
+          box-shadow: 0 0 0 3px rgba(246, 139, 30, 0.15);
+        }
+
+        .jm-home-cat-select:active {
+          border-color: #e07b0f;
+        }
+
+        .jm-home-cat-select__arrow {
+          position: absolute;
+          right: 14px;
+          color: #868e96;
+          pointer-events: none;
+          display: flex;
+          align-items: center;
+          transition: color 0.2s ease, transform 0.2s ease;
+        }
+
+        .jm-home-cat-select-wrap:focus-within .jm-home-cat-select__arrow {
+          color: #f68b1e;
+          transform: rotate(180deg);
+        }
+
+        .jm-home-cat-select option {
+          padding: 10px 14px;
+          font-size: 0.88rem;
+          font-weight: 400;
+          line-height: 1.5;
+        }
+
+        @media (max-width: 768px) {
+          .jm-home-cat-select-wrap {
+            max-width: 100%;
+          }
+          .jm-home-cat-select {
+            padding: 11px 36px 11px 38px;
+            font-size: 0.88rem;
+            border-radius: 10px;
+          }
+          .jm-home-cat-select__icon {
+            left: 12px;
+          }
+          .jm-home-cat-select__arrow {
             right: 12px;
           }
         }
