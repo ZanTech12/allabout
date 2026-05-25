@@ -325,7 +325,7 @@ export default function Home() {
   const [selectedHomeCat, setSelectedHomeCat] = useState("");
   const [browseExpanded, setBrowseExpanded] = useState(false);
   const [isFlashing, setIsFlashing] = useState(false);
-  const [expandedCats, setExpandedCats] = useState(new Set()); // <-- Track expanded categories
+  const [expandedCats, setExpandedCats] = useState(new Set()); // <-- Track expanded category
 
   const { addToCart = () => {}, cart = [], isSyncing = false } = useCart();
 
