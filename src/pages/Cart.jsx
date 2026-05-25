@@ -7,6 +7,9 @@ import api from '../api/axios';
 import Point from './Point';
 import './Cart.css';
 
+// ✅ Paystack public key — set in your .env as VITE_PAYSTACK_PUBLIC_KEY
+const PAYSTACK_PUBLIC_KEY = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || "pk_test_32e4db222573929ba9f18b20d4ccc6da84733b9f";
+
 const getEffectivePrice = (item, isEngineer = false) => {
   const price = Number(item.price) || 0;
   const discountPrice = Number(item.discountPrice) || 0;
@@ -26,8 +29,6 @@ const BANK_ACCOUNTS = [
     color: "#00C07F",
     icon: "lucide:smartphone",
   },
- 
-  
 ];
 
 export default function Cart() {
@@ -57,6 +58,9 @@ export default function Cart() {
   // ✅ Bank modal state
   const [showBankModal, setShowBankModal] = useState(false);
   const [copiedField, setCopiedField] = useState("");
+
+  // ✅ Paystack state
+  const [paystackInit, setPaystackInit] = useState(false);
 
   // ✅ Delivery settings from SiteSettings
   const [deliverySettings, setDeliverySettings] = useState({
@@ -279,7 +283,8 @@ export default function Cart() {
     coinDiscount: coinDiscount,
     amountPaid: amountToPay,
     paymentMethod,
-    bankTransferReference: transactionRef || undefined,
+    bankTransferReference: paymentMethod === "bank_transfer" ? transactionRef : undefined,
+    paystackReference: paymentMethod === "paystack" ? transactionRef : undefined,
     shippingAddress: shippingInfo,
   });
 
@@ -307,6 +312,100 @@ export default function Cart() {
     }
   };
 
+  // ✅ Paystack: Load inline script dynamically
+  const loadPaystackScript = () => {
+    return new Promise((resolve, reject) => {
+      if (window.PaystackPop) {
+        resolve();
+        return;
+      }
+      const script = document.createElement('script');
+      script.src = 'https://js.paystack.co/v2/inline.js';
+      script.onload = () => setTimeout(resolve, 100);
+      script.onerror = () => reject(new Error("Failed to load Paystack"));
+      document.body.appendChild(script);
+    });
+  };
+
+  // ✅ Paystack: Payment handler
+  const handlePaystackPayment = async () => {
+    if (placing) return;
+    if (!validateShipping()) return setShowMobileForm(true);
+
+    if (amountToPay <= 0) {
+      setError("Amount must be greater than zero for card payment.");
+      return;
+    }
+
+    if (!PAYSTACK_PUBLIC_KEY) {
+      setError("Paystack is not configured. Please use another payment method.");
+      return;
+    }
+
+    setPlacing(true);
+    setError("");
+    setPaystackInit(true);
+
+    try {
+      await loadPaystackScript();
+
+      const reference = `PS-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+
+      const handler = window.PaystackPop.setup({
+        key: PAYSTACK_PUBLIC_KEY,
+        email: customerEmail || "no-email@provided.com",
+        amount: Math.round(amountToPay * 100), // Convert naira to kobo
+        currency: "NGN",
+        ref: reference,
+        metadata: {
+          custom_fields: [
+            {
+              display_name: "Customer Name",
+              variable_name: "customer_name",
+              value: shippingInfo.fullName,
+            },
+            {
+              display_name: "Phone",
+              variable_name: "phone",
+              value: shippingInfo.phone,
+            },
+            {
+              display_name: "Coin Discount",
+              variable_name: "coin_discount",
+              value: coinDiscount > 0 ? `${coinsToUse} coins (₦${coinDiscount})` : "None",
+            },
+          ],
+        },
+        onClose: () => {
+          setPlacing(false);
+          setPaystackInit(false);
+        },
+        callback: async (response) => {
+          try {
+            const orderData = buildOrderPayload("paystack", response.reference);
+            await api.post("/orders", orderData);
+            await clearCart();
+            setIsPaid(true);
+          } catch (err) {
+            setError(
+              err.response?.data?.message ||
+              `Payment successful but order creation failed. Please contact support with ref: ${response.reference}`
+            );
+          } finally {
+            setPlacing(false);
+            setPaystackInit(false);
+          }
+        },
+      });
+
+      handler.openIframe();
+    } catch (err) {
+      setError("Failed to initialize Paystack payment. Please try another method.");
+      setPlacing(false);
+      setPaystackInit(false);
+    }
+  };
+
   // ✅ Bank Transfer payment handler — opens the modal
   const handleBankTransfer = () => {
     if (placing) return;
@@ -324,7 +423,6 @@ export default function Cart() {
       const orderData = buildOrderPayload("bank_transfer", reference);
       await api.post("/orders", orderData);
 
-      // ✅ Send transfer details to WhatsApp
       const message = buildBankTransferWhatsAppMessage(reference);
       window.open(
         `https://wa.me/${ADMIN_WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`,
@@ -839,8 +937,9 @@ export default function Cart() {
               </div>
             )}
 
-            {/* ✅ Pay with Coins button (when fully covered) */}
+            {/* ✅ Payment Buttons */}
             {amountToPay === 0 && useCoins ? (
+              /* ✅ Fully covered by coins */
               <button
                 className="cart-checkout-btn"
                 onClick={handleFullCoinPayment}
@@ -858,21 +957,84 @@ export default function Cart() {
                 )}
               </button>
             ) : (
-              <button
-                className="cart-checkout-btn"
-                onClick={handleBankTransfer}
-                disabled={placing || isSyncing || amountToPay < 0}
-              >
-                {placing || isSyncing ? (
-                  <><Icon icon="lucide:loader-2" width={16} style={{ animation: 'spin 1s linear infinite' }} /> Processing...</>
-                ) : (
-                  <>
-                    <Icon icon="lucide:building-2" width={16} />
-                    Pay ₦{amountToPay.toLocaleString()} via Bank Transfer
-                    {coinsToUse > 0 && <span style={{ opacity: 0.8, marginLeft: '4px' }}>+ {coinsToUse} coins</span>}
-                  </>
+              <>
+                {/* ✅ Paystack — Primary payment option */}
+                <button
+                  className="cart-checkout-btn"
+                  onClick={handlePaystackPayment}
+                  disabled={placing || isSyncing || amountToPay <= 0 || !PAYSTACK_PUBLIC_KEY}
+                  style={{
+                    background: (placing || isSyncing || !PAYSTACK_PUBLIC_KEY)
+                      ? '#9ca3af'
+                      : 'linear-gradient(135deg, #0ABF53, #089342)',
+                  }}
+                >
+                  {paystackInit ? (
+                    <><Icon icon="lucide:loader-2" width={16} style={{ animation: 'spin 1s linear infinite' }} /> Initializing...</>
+                  ) : placing || isSyncing ? (
+                    <><Icon icon="lucide:loader-2" width={16} style={{ animation: 'spin 1s linear infinite' }} /> Processing...</>
+                  ) : (
+                    <>
+                      <Icon icon="lucide:credit-card" width={16} />
+                      Pay ₦{amountToPay.toLocaleString()} with Paystack
+                      {coinsToUse > 0 && <span style={{ opacity: 0.85, marginLeft: '4px' }}>+ {coinsToUse} coins</span>}
+                    </>
+                  )}
+                </button>
+
+                {/* ✅ Paystack secure badges */}
+                {amountToPay > 0 && PAYSTACK_PUBLIC_KEY && (
+                  <div style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    gap: '12px', margin: '6px 0 2px', fontSize: '11px', color: '#6b7280',
+                  }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                      <Icon icon="lucide:shield-check" width={12} color="#0ABF53" /> Secure
+                    </span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                      <Icon icon="lucide:lock" width={12} color="#0ABF53" /> Encrypted
+                    </span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                      <Icon icon="lucide:zap" width={12} color="#0ABF53" /> Instant
+                    </span>
+                  </div>
                 )}
-              </button>
+
+                <div className="cart-or-divider">OR</div>
+
+                {/* ✅ Bank Transfer */}
+                <button
+                  onClick={handleBankTransfer}
+                  disabled={placing || isSyncing || amountToPay < 0}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    borderRadius: '10px',
+                    border: '2px solid #f68b1e',
+                    background: 'transparent',
+                    color: '#f68b1e',
+                    fontWeight: 700,
+                    fontSize: '14px',
+                    cursor: placing || isSyncing ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    transition: 'all 0.2s',
+                    opacity: placing || isSyncing ? 0.6 : 1,
+                  }}
+                >
+                  {placing || isSyncing ? (
+                    <Icon icon="lucide:loader-2" width={16} style={{ animation: 'spin 1s linear infinite' }} />
+                  ) : (
+                    <>
+                      <Icon icon="lucide:building-2" width={16} />
+                      Pay ₦{amountToPay.toLocaleString()} via Bank Transfer
+                      {coinsToUse > 0 && <span style={{ opacity: 0.7, marginLeft: '2px' }}>+ {coinsToUse} coins</span>}
+                    </>
+                  )}
+                </button>
+              </>
             )}
 
             <div className="cart-or-divider">OR</div>
@@ -937,17 +1099,45 @@ export default function Cart() {
                 )}
               </button>
             ) : (
-              <button
-                onClick={handleBankTransfer}
-                disabled={placing || isSyncing}
-                className="cart-mobile-pay-btn"
-              >
-                {placing || isSyncing ? (
-                  <Icon icon="lucide:loader-2" width={16} style={{ animation: 'spin 1s linear infinite' }} />
-                ) : (
-                  <>₦{amountToPay.toLocaleString()}</>
-                )}
-              </button>
+              <>
+                {/* ✅ Mobile Paystack button */}
+                <button
+                  onClick={handlePaystackPayment}
+                  disabled={placing || isSyncing || amountToPay <= 0 || !PAYSTACK_PUBLIC_KEY}
+                  className="cart-mobile-pay-btn"
+                  style={{
+                    background: (placing || isSyncing || !PAYSTACK_PUBLIC_KEY)
+                      ? '#9ca3af'
+                      : 'linear-gradient(135deg, #0ABF53, #089342)',
+                  }}
+                >
+                  {paystackInit || placing || isSyncing ? (
+                    <Icon icon="lucide:loader-2" width={16} style={{ animation: 'spin 1s linear infinite' }} />
+                  ) : (
+                    <>₦{amountToPay.toLocaleString()}</>
+                  )}
+                </button>
+                {/* ✅ Mobile Bank Transfer button */}
+                <button
+                  onClick={handleBankTransfer}
+                  disabled={placing || isSyncing}
+                  style={{
+                    padding: '10px',
+                    borderRadius: '8px',
+                    border: '2px solid #f68b1e',
+                    background: 'transparent',
+                    color: '#f68b1e',
+                    cursor: placing || isSyncing ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    opacity: placing || isSyncing ? 0.6 : 1,
+                  }}
+                  title="Pay via Bank Transfer"
+                >
+                  <Icon icon="lucide:building-2" width={18} />
+                </button>
+              </>
             )}
             <button
               onClick={handleWhatsAppOrder}
