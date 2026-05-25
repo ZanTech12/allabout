@@ -332,7 +332,7 @@ export default function Home() {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeSearch = searchParams.get("search") || "";
 
-  const companyName = siteSettings?.companyName || "Sulaitek Communication";
+  const companyName = siteSettings?.companyName || "All-About Communication Investment";
   const companyTagline = siteSettings?.companyTagline || "Your One-Stop Online Mall";
   const companyLogo = siteSettings?.logo || "";
   const companyAddress = siteSettings?.address || "";
