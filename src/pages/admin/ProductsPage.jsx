@@ -12,7 +12,7 @@ import { useAuth } from "../../context/AuthContext";
 import Modal from "./Modal";
 import DeleteConfirm from "./DeleteConfirm";
 import Toast from "./Toast";
-import imageCompression from "browser-image-compression"; // ✅ NEW IMPORT
+import imageCompression from "browser-image-compression";
 import "./ProductsPage.css";
 
 function useIsMobile(breakpoint = 992) {
@@ -75,6 +75,7 @@ export default function ProductsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0); // ✅ NEW STATE
 
   const [message, setMessage] = useState({ type: "", text: "" });
 
@@ -109,7 +110,6 @@ export default function ProductsPage() {
     };
   }, []);
 
-  // ✅ Lock body scroll when form modal is open on mobile
   useEffect(() => {
     if (showForm && isMobile) {
       document.body.style.overflow = "hidden";
@@ -215,38 +215,36 @@ export default function ProductsPage() {
   };
 
   // ═══════════════════════════════════════════════
-  // ✅ UPDATED IMAGE UPLOAD HANDLER WITH COMPRESSION
+  // ✅ UPDATED IMAGE UPLOAD HANDLER WITH COMPRESSION + PROGRESS
   // ═══════════════════════════════════════════════
   const handleImageUpload = async (e) => {
     const files = Array.from(e.target.files);
     if (!files.length) return;
-    
+
     setUploadingImage(true);
-    
+    setUploadProgress(0); // ✅ Reset progress at start
+
     try {
-      // ✅ Compress all files in parallel
       const compressedFiles = await Promise.all(
         files.map(async (file) => {
           try {
             const options = {
-              maxSizeMB: 1,             // Compress to under 1MB (Fixes server rejection)
-              maxWidthOrHeight: 1024,   // Scale down massive mobile photos
+              maxSizeMB: 1,
+              maxWidthOrHeight: 1024,
               useWebWorker: true,
             };
-            
+
             const compressedBlob = await imageCompression(file, options);
-            
-            // ✅ Convert Blob to File and force .jpg extension
-            // This prevents backend issues with missing extensions on HEIC conversions
+
             return new File(
-              [compressedBlob], 
-              file.name.replace(/\.[^/.]+$/, "") + ".jpg", 
+              [compressedBlob],
+              file.name.replace(/\.[^/.]+$/, "") + ".jpg",
               { type: "image/jpeg", lastModified: Date.now() }
             );
-            
+
           } catch (compressionError) {
             console.error("Compression failed, falling back to original:", compressionError);
-            return file; // Fallback to original if compression fails
+            return file;
           }
         })
       );
@@ -256,10 +254,19 @@ export default function ProductsPage() {
         formData.append("images", file);
       });
 
+      // ✅ Track upload progress via axios onUploadProgress
       const response = await api.post("/upload", formData, {
         headers: { "Content-Type": "multipart/form-data" },
+        onUploadProgress: (progressEvent) => {
+          if (progressEvent.total) {
+            const percent = Math.round(
+              (progressEvent.loaded * 100) / progressEvent.total
+            );
+            setUploadProgress(percent);
+          }
+        },
       });
-      
+
       const uploadedUrls = response.data.urls;
       if (Array.isArray(uploadedUrls)) {
         setForm((prev) => ({
@@ -275,6 +282,7 @@ export default function ProductsPage() {
       showMessage("error", error.response?.data?.message || "Upload failed");
     } finally {
       setUploadingImage(false);
+      setUploadProgress(0); // ✅ Reset progress when done
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
@@ -391,7 +399,7 @@ export default function ProductsPage() {
   }, [products, searchTerm, filterCategory, filterFlash, filterFeatured, filterNew, filterDiscounted]);
 
   const handleImgError = (e, fallbackText) => {
-    e.target.onerror = null; 
+    e.target.onerror = null;
     e.target.src = `data:image/svg+xml,${encodeURIComponent(
       `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" fill="%23e9ecef"><rect width="200" height="200"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="%23adb5bd" font-family="sans-serif" font-size="14">${fallbackText || 'No image'}</text></svg>`
     )}`;
@@ -625,7 +633,6 @@ export default function ProductsPage() {
               <div className="prod-form__images-header">
                 <label className="prod-form__label">Images</label>
                 <div className="prod-form__images-actions">
-                  {/* ✅ UPDATED: accept attribute forces iOS to convert HEIC to JPEG */}
                   <input
                     type="file"
                     multiple
@@ -641,9 +648,22 @@ export default function ProductsPage() {
                     disabled={uploadingImage}
                   >
                     <Icon icon={uploadingImage ? "lucide:loader-2" : "lucide:upload"} width={14} />
-                    {/* ✅ UPDATED: Better user feedback */}
-                    {uploadingImage ? "Compressing..." : "Upload"}
+                    {/* ✅ UPDATED: Show percentage during upload */}
+                    {uploadingImage
+                      ? uploadProgress > 0
+                        ? `Uploading ${uploadProgress}%`
+                        : "Compressing..."
+                      : "Upload"}
                   </button>
+                  {/* ✅ NEW: Progress bar under the button */}
+                  {uploadingImage && (
+                    <div className="prod-form__upload-progress">
+                      <div
+                        className="prod-form__upload-progress-bar"
+                        style={{ width: `${uploadProgress}%` }}
+                      />
+                    </div>
+                  )}
                   <button
                     type="button"
                     onClick={addImageField}
