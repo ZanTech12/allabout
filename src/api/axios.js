@@ -1,9 +1,12 @@
 import axios from "axios";
 
 const api = axios.create({
-  // ✅ CHANGED: Fallback is now "/api" so your vite.config.js proxy works locally
+  // ✅ Perfect: Works locally with Vite proxy, works on Vercel with rewrites
   baseURL: import.meta.env.VITE_API_URL || "/api",
-  timeout: 15000,
+  
+  // 🚨 CHANGED: Increased to 60 seconds to handle Render free-tier cold starts
+  timeout: 60000, 
+  
   headers: { "Content-Type": "application/json" },
 });
 

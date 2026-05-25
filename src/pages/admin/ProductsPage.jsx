@@ -12,6 +12,7 @@ import { useAuth } from "../../context/AuthContext";
 import Modal from "./Modal";
 import DeleteConfirm from "./DeleteConfirm";
 import Toast from "./Toast";
+import imageCompression from "browser-image-compression"; // ✅ NEW IMPORT
 import "./ProductsPage.css";
 
 function useIsMobile(breakpoint = 992) {
@@ -213,18 +214,52 @@ export default function ProductsPage() {
     });
   };
 
+  // ═══════════════════════════════════════════════
+  // ✅ UPDATED IMAGE UPLOAD HANDLER WITH COMPRESSION
+  // ═══════════════════════════════════════════════
   const handleImageUpload = async (e) => {
-    const files = e.target.files;
-    if (!files?.length) return;
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
+    
     setUploadingImage(true);
-    const formData = new FormData();
-    for (let i = 0; i < files.length; i++) {
-      formData.append("images", files[i]);
-    }
+    
     try {
+      // ✅ Compress all files in parallel
+      const compressedFiles = await Promise.all(
+        files.map(async (file) => {
+          try {
+            const options = {
+              maxSizeMB: 1,             // Compress to under 1MB (Fixes server rejection)
+              maxWidthOrHeight: 1024,   // Scale down massive mobile photos
+              useWebWorker: true,
+            };
+            
+            const compressedBlob = await imageCompression(file, options);
+            
+            // ✅ Convert Blob to File and force .jpg extension
+            // This prevents backend issues with missing extensions on HEIC conversions
+            return new File(
+              [compressedBlob], 
+              file.name.replace(/\.[^/.]+$/, "") + ".jpg", 
+              { type: "image/jpeg", lastModified: Date.now() }
+            );
+            
+          } catch (compressionError) {
+            console.error("Compression failed, falling back to original:", compressionError);
+            return file; // Fallback to original if compression fails
+          }
+        })
+      );
+
+      const formData = new FormData();
+      compressedFiles.forEach((file) => {
+        formData.append("images", file);
+      });
+
       const response = await api.post("/upload", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
+      
       const uploadedUrls = response.data.urls;
       if (Array.isArray(uploadedUrls)) {
         setForm((prev) => ({
@@ -234,7 +269,7 @@ export default function ProductsPage() {
             ...uploadedUrls,
           ],
         }));
-        showMessage("success", `${uploadedUrls.length} image(s) uploaded`);
+        showMessage("success", `${uploadedUrls.length} image(s) compressed & uploaded`);
       }
     } catch (error) {
       showMessage("error", error.response?.data?.message || "Upload failed");
@@ -327,13 +362,11 @@ export default function ProductsPage() {
     }
   };
 
-  // ✅ Clear a specific filter
   const clearFilter = (key) => {
     searchParams.delete(key);
     setSearchParams(searchParams);
   };
 
-  // ✅ Clear all filters
   const clearAllFilters = () => {
     setSearchParams({});
   };
@@ -357,15 +390,13 @@ export default function ProductsPage() {
     });
   }, [products, searchTerm, filterCategory, filterFlash, filterFeatured, filterNew, filterDiscounted]);
 
-  // ✅ Handle image load error with fallback
   const handleImgError = (e, fallbackText) => {
-    e.target.onerror = null; // Prevent infinite loop
+    e.target.onerror = null; 
     e.target.src = `data:image/svg+xml,${encodeURIComponent(
       `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" fill="%23e9ecef"><rect width="200" height="200"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="%23adb5bd" font-family="sans-serif" font-size="14">${fallbackText || 'No image'}</text></svg>`
     )}`;
   };
 
-  // ✅ Active filter chips data
   const activeFilterChips = useMemo(() => {
     const chips = [];
     if (filterCategory) chips.push({ key: "category", label: filterCategory });
@@ -464,7 +495,6 @@ export default function ProductsPage() {
         onClose={resetForm}
         title={editingProduct ? "Edit Product" : "Add Product"}
       >
-        {/* ✅ Scrollable form container for mobile */}
         <div className="prod-form-scroll">
           <form onSubmit={handleSubmit} className="prod-form" noValidate>
             {/* Product Name */}
@@ -590,15 +620,16 @@ export default function ProductsPage() {
               </div>
             </div>
 
-            {/* Images */}
+            {/* ═══ IMAGES ═══ */}
             <div className="prod-form__group">
               <div className="prod-form__images-header">
                 <label className="prod-form__label">Images</label>
                 <div className="prod-form__images-actions">
+                  {/* ✅ UPDATED: accept attribute forces iOS to convert HEIC to JPEG */}
                   <input
                     type="file"
                     multiple
-                    accept="image/*"
+                    accept="image/jpeg,image/png,image/webp"
                     ref={fileInputRef}
                     onChange={handleImageUpload}
                     style={{ display: "none" }}
@@ -610,7 +641,8 @@ export default function ProductsPage() {
                     disabled={uploadingImage}
                   >
                     <Icon icon={uploadingImage ? "lucide:loader-2" : "lucide:upload"} width={14} />
-                    {uploadingImage ? "Uploading..." : "Upload"}
+                    {/* ✅ UPDATED: Better user feedback */}
+                    {uploadingImage ? "Compressing..." : "Upload"}
                   </button>
                   <button
                     type="button"
@@ -633,7 +665,6 @@ export default function ProductsPage() {
                       placeholder="Image URL"
                       autoComplete="off"
                     />
-                    {/* ✅ Preview thumbnail if URL looks valid */}
                     {img && img.startsWith("http") && (
                       <img
                         src={img}
@@ -761,7 +792,6 @@ export default function ProductsPage() {
                   className="prod-mobile-card__img"
                   onError={(e) => handleImgError(e, p.name?.charAt(0) || "?")}
                 />
-                {/* ✅ Badge flags */}
                 <div className="prod-mobile-card__badges">
                   {parseBool(p.isFeatured) && (
                     <span className="prod-badge prod-badge--featured">Featured</span>
