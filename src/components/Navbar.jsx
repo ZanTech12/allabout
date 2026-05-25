@@ -24,8 +24,8 @@ export default function Navbar() {
   const dropdownRef = useRef(null);
   const searchInputRef = useRef(null);
 
-  const companyName = siteSettings?.companyName || "Sulaitek Communication";
-  const companyTagline = siteSettings?.companyTagline || "Shop smarter";
+  const companyName = siteSettings?.companyName || "All About Communication Investment";
+  const companyTagline = siteSettings?.companyTagline || "YOUR ONE-STOP ONLINE MALL";
   const companyLogo = siteSettings?.logo || "";
 
   useEffect(() => {
