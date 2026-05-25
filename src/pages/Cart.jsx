@@ -58,7 +58,7 @@ export default function Cart() {
   const customerEmail = user?.email || "";
   const canSeeEngPricing = user?.role === "admin" || user?.role === "engineer";
 
-  const ADMIN_WHATSAPP_NUMBER = "2347085059169";
+  const ADMIN_WHATSAPP_NUMBER = "2348036742968";
 
   const [backendPricing, setBackendPricing] = useState({});
   const [isPaid, setIsPaid] = useState(false);
