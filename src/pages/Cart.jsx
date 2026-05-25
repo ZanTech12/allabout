@@ -20,26 +20,14 @@ const getEffectivePrice = (item, isEngineer = false) => {
 
 const BANK_ACCOUNTS = [
   {
-    name: "Salawu Sulaimon Ayinde",
-    accountNumber: "7085059169",
-    bank: "Opay",
+    name: "ALL ABOUT COMMUNICATION",
+    accountNumber: "0075702929",
+    bank: "Access Bank",
     color: "#00C07F",
     icon: "lucide:smartphone",
   },
-  {
-    name: "Salawu Sulaimon Ayinde",
-    accountNumber: "7085059169",
-    bank: "Palmpay",
-    color: "#A855F7",
-    icon: "lucide:smartphone",
-  },
-  {
-    name: "Salawu Sulaimon Ayinde",
-    accountNumber: "0128209993",
-    bank: "GTBank",
-    color: "#E34A27",
-    icon: "lucide:building-2",
-  },
+ 
+  
 ];
 
 export default function Cart() {
